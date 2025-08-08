@@ -1,0 +1,179 @@
+<% if (typeof error !== 'undefined') { %>
+  <div class="alert alert-danger" role="alert">
+    <%= error %>
+    <a href="/invite-code" class="alert-link">Click here to enter the invite code</a>.
+  </div>
+<% } %>
+
+<div class="search-container mb-4">
+  <form action="/search" method="get" class="row g-3">
+    <div class="col-md-6">
+      <input type="text" name="searchtext" value="<%= searchtext %>" class="form-control" placeholder="Search for wallpapers...">
+    </div>
+    <div class="col-md-2">
+      <select name="requiredtags" class="form-select">
+        <!-- <option value="" <%= requiredtags === '' ? 'selected' : '' %>>All Ages</option> -->
+        <option value="Everyone" <%= requiredtags === 'Everyone' ? 'selected' : '' %>>Everyone</option>
+        <option value="Questionable" <%= requiredtags === 'Questionable' ? 'selected' : '' %>>Questionable</option>
+        <option value="Mature" <%= requiredtags === 'Mature' ? 'selected' : '' %>>Mature</option>
+      </select>
+    </div>
+    <div class="col-md-2">
+      <select name="requiredtype" class="form-select">
+        <option value="" <%= requiredtype === '' ? 'selected' : '' %>>All Types</option>
+        <option value="Scene" <%= requiredtype === 'Scene' ? 'selected' : '' %>>Scene</option>
+        <option value="Video" <%= requiredtype === 'Video' ? 'selected' : '' %>>Video</option>
+        <option value="Application" <%= requiredtype === 'Application' ? 'selected' : '' %>>Application</option>
+        <option value="Web" <%= requiredtype === 'Web' ? 'selected' : '' %>>Web</option>
+      </select>
+    </div>
+    <div class="col-md-2">
+      <select name="browsesort" class="form-select">
+        <option value="textsearch" <%= browsesort === 'textsearch' ? 'selected' : '' %>>Relevance</option>
+        <option value="totaluniquesubscribers" <%= browsesort === 'totaluniquesubscribers' ? 'selected' : '' %>>Most Subscribed</option>
+        <option value="mostrecent" <%= browsesort === 'mostrecent' ? 'selected' : '' %>>Most Recent</option>
+        <option value="trend&days=1" <%= browsesort === 'trend&days=1' ? 'selected' : '' %>>Trending Today</option>
+        <option value="trend&days=7" <%= browsesort === 'trend&days=7' ? 'selected' : '' %>>Trending Last 7 Days</option>
+        <option value="trend&days=30" <%= browsesort === 'trend&days=30' ? 'selected' : '' %>>Trending Last 30 Days</option>
+        <option value="trend&days=365" <%= browsesort === 'trend&days=365' ? 'selected' : '' %>>Trending Last 365 Days</option>
+        <option value="trend&days=-1" <%= browsesort === 'trend&days=-1' ? 'selected' : '' %>>Trending All Time</option>
+      </select>
+    </div>
+    <div class="col-md-12">
+      <input type="hidden" name="p" value="<%= page %>">
+      <button type="submit" class="btn btn-primary">Search</button>
+    </div>
+  </form>
+</div>
+<div class="row">
+  <% items.forEach(item => { %>
+    <div class="col-md-4 mb-4">
+      <div class="card">
+        <!-- 图片大小限制为 200x200 -->
+        <div style="width: 200px; height: 200px; overflow: hidden; margin: 0 auto;">
+          <img src="<%= item.previewImage %>" class="img-fluid" alt="<%= item.title %>" style="width: 100%; height: 100%; object-fit: cover;">
+        </div>
+        <div class="card-body">
+          <h5 class="card-title"><%= item.title %></h5>
+          <p class="card-text">By: <%= item.authorName %></p>
+          <a href="/item/<%= item.sharedfileId %>" class="btn btn-primary">View Details</a>
+        </div>
+      </div>
+    </div>
+  <% }) %>
+</div>
+
+
+<% if (maxPage > 1) { %>
+  <nav aria-label="Page navigation">
+    <ul class="pagination justify-content-center">
+      <% if (page > 1) { %>
+        <!-- 如果 p > 1，显示 "First Page" 按钮 -->
+        <% if (page > 2) { %>
+          <li class="page-item">
+            <a class="page-link" href="/search?searchtext=<%= encodeURIComponent(searchtext) %>&requiredtags=<%= requiredtags %>&requiredtype=<%= requiredtype %>&section=<%= section %>&p=1&browsesort=<%= browsesort %>">First Page</a>
+          </li>
+        <% } %>
+        <!-- 保留原有的 "Previous" 按钮 -->
+        <li class="page-item">
+          <a class="page-link" href="/search?searchtext=<%= encodeURIComponent(searchtext) %>&requiredtags=<%= requiredtags %>&requiredtype=<%= requiredtype %>&section=<%= section %>&p=<%= parseInt(page) - 1 %>&browsesort=<%= browsesort %>">Previous</a>
+        </li>
+      <% } %>
+      <!-- 当前页码 -->
+      <li class="page-item disabled">
+        <span class="page-link">Page <%= page %> of <%= maxPage %></span>
+      </li>
+      <% if (page < maxPage) { %>
+        <!-- 保留原有的 "Next" 按钮 -->
+        <li class="page-item">
+          <a class="page-link" href="/search?searchtext=<%= encodeURIComponent(searchtext) %>&requiredtags=<%= requiredtags %>&requiredtype=<%= requiredtype %>&section=<%= section %>&p=<%= parseInt(page) + 1 %>&browsesort=<%= browsesort %>">Next</a>
+        </li>
+        <!-- 如果 p < maxPage - 1，显示 "Last Page" 按钮 -->
+        <% if (page < maxPage - 1) { %>
+          <li class="page-item">
+            <a class="page-link" href="/search?searchtext=<%= encodeURIComponent(searchtext) %>&requiredtags=<%= requiredtags %>&requiredtype=<%= requiredtype %>&section=<%= section %>&p=<%= maxPage %>&browsesort=<%= browsesort %>">Last Page</a>
+          </li>
+        <% } %>
+      <% } %>
+    </ul>
+  </nav>
+<% } %>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    const matureOption = document.querySelector('select[name="requiredtags"] option[value="Mature"]');
+    const codeCookie = document.cookie.split('; ').find(row => row.startsWith('code='));
+
+    if (!codeCookie) {
+      matureOption.disabled = true;
+      matureOption.textContent = 'Mature (Requires Invite Code)';
+    }
+  });
+</script>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    const searchForm = document.querySelector('form[action="/search"]');
+    const searchTextInput = searchForm.querySelector('input[name="searchtext"]');
+    const requiredTagsSelect = searchForm.querySelector('select[name="requiredtags"]');
+    const requiredTypeSelect = searchForm.querySelector('select[name="requiredtype"]');
+    const browseSortSelect = searchForm.querySelector('select[name="browsesort"]');
+    const pageInput = searchForm.querySelector('input[name="p"]');
+
+        // 监听 searchtext 输入框的变化
+    searchTextInput.addEventListener('input', function() {
+      // 重置 p 为 1
+      pageInput.value = 1;
+    });
+
+    // 监听下拉菜单的变化
+    [requiredTagsSelect, requiredTypeSelect, browseSortSelect].forEach(select => {
+      select.addEventListener('change', function() {
+        // 重置 p 为 1
+        pageInput.value = 1;
+      });
+    });
+
+    // 解析当前 URL 中的参数
+    function getUrlParams() {
+      const params = new URLSearchParams(window.location.search);
+      return {
+        searchtext: params.get('searchtext'),
+        requiredtags: params.get('requiredtags'),
+        requiredtype: params.get('requiredtype'),
+        browsesort: params.get('browsesort'),
+        p: params.get('p'),
+      };
+    }
+
+    // 检查 URL 参数是否发生变化
+    function checkUrlParams() {
+      const currentParams = getUrlParams();
+      const initialParams = { ...currentParams }; // 保存初始参数
+
+      // 监听 URL 变化
+      window.addEventListener('popstate', function() {
+        const newParams = getUrlParams();
+
+        // 如果 searchtext、requiredtags、requiredtype 或 browsesort 发生变化
+        if (
+          newParams.searchtext !== initialParams.searchtext ||
+          newParams.requiredtags !== initialParams.requiredtags ||
+          newParams.requiredtype !== initialParams.requiredtype ||
+          newParams.browsesort !== initialParams.browsesort
+        ) {
+          // 重置 p 为 1
+          const url = new URL(window.location.href);
+          url.searchParams.set('p', 1);
+          window.history.replaceState(null, '', url.toString());
+
+          // 更新表单中的 p 值
+          pageInput.value = 1;
+        }
+      });
+    }
+
+    // 初始化检查
+    checkUrlParams();
+  });
+</script>

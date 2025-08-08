@@ -1,0 +1,24 @@
+<div class="container mt-4">
+  <h2>Invite Code</h2>
+
+  <% if (typeof error !== 'undefined') { %>
+    <div class="alert alert-danger" role="alert">
+      <%= error %>
+    </div>
+  <% } %>
+
+  <% if (typeof code !== 'undefined' && code === correctInviteCode) { %>
+    <div class="alert alert-success" role="alert">
+      Congratulations, you have unlocked the search permission for Mature content.
+    </div>
+  <% } else { %>
+    <p>Please enter your invite code to unlock the search permission for Mature content.</p>
+    <form action="/submit-invite-code" method="post">
+      <div class="mb-3">
+        <label for="inviteCode" class="form-label"><b>Invite Code</b></label>
+        <input type="text" class="form-control" id="inviteCode" name="inviteCode" required>
+      </div>
+      <button type="submit" class="btn btn-primary">Submit</button>
+    </form>
+  <% } %>
+</div>

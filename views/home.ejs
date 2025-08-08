@@ -1,0 +1,167 @@
+<div class="search-container">
+  <form action="/search" method="get" class="row g-3">
+    <div class="col-md-6">
+      <input type="text" name="searchtext" class="form-control" placeholder="Search for wallpapers...">
+    </div>
+    <div class="col-md-2">
+      <select name="requiredtags" class="form-select">
+        <!-- <option value="">All Ages</option> -->
+        <option value="Everyone" selected>Everyone</option>
+        <option value="Questionable">Questionable</option>
+        <option value="Mature">Mature</option>
+      </select>
+    </div>
+    <div class="col-md-2">
+      <select name="requiredtype" class="form-select">
+        <option value="">All Types</option>
+        <option value="Scene">Scene</option>
+        <option value="Video">Video</option>
+        <option value="Application">Application</option>
+        <option value="Web">Web</option>
+      </select>
+    </div>
+    <div class="col-md-2">
+      <select name="browsesort" class="form-select">
+        <option value="textsearch">Relevance</option>
+        <option value="totaluniquesubscribers">Most Subscribed</option>
+        <option value="mostrecent">Most Recent</option>
+        <option value="trend&days=1">Trending Today</option>
+        <option value="trend&days=7">Trending Last 7 Days</option>
+        <option value="trend&days=30">Trending Last 30 Days</option>
+        <option value="trend&days=365">Trending Last 365 Days</option>
+        <option value="trend&days=-1">Trending All Time</option>
+      </select>
+    </div>
+    <div class="col-md-12">
+      <input type="hidden" name="p" value="1">
+      <button type="submit" class="btn btn-primary">Search</button>
+    </div>
+  </form>
+</div>
+
+
+<div class="home-description mt-4">
+  <p>This is a tool for searching <b>Wallpaper Engine</b> workshop wallpapers.</p>
+
+  <h3>Prerequisites for using this tool:</h3>
+  <ul>
+    <li>
+      Have a <a href="https://store.steampowered.com/" target="_blank">Steam</a> account with
+      <a href="https://store.steampowered.com/app/431960/Wallpaper_Engine/" target="_blank">Wallpaper Engine</a> in your game library.
+    </li>
+    <li>Have a computer.</li>
+  </ul>
+
+  <h3>Steps to download wallpapers:</h3>
+
+  <span><big><b>&nbsp;&nbsp;Using SteamCMD:</b></big></span>
+  <ol>
+    <li>
+      Install SteamCMD. Windows users can download it from this link:
+      <a href="https://steamcdn-a.akamaihd.net/client/installer/steamcmd.zip" target="_blank">steamcmd.zip</a>, extract it to a location without Chinese characters in the path, and click <b><code>steamcmd.exe</code></b>.
+      <br>
+      <b>Linux and macOS users should follow the
+      <a href="https://developer.valvesoftware.com/wiki/Zh/SteamCMD#Linux" target="_blank">official documentation</a></b>.
+    </li>
+    <li>
+      After launching SteamCMD, enter <b><code>login [yourusername]</code></b>. <br>
+      Then follow the instructions in the console.<br>
+      <strong style="color: red;">Note:</strong> Do not include the brackets! 
+    </li>
+    <li>
+      Open this tool and search for the wallpaper you want. In the search results, click the <b>View Details</b> button, find the SteamCMD command at the bottom, paste it into the SteamCMD console, and press Enter.
+    </li>
+  </ol>
+
+  <span><big><b>&nbsp;&nbsp;Using Steam Client (Windows only):</b></big></span>
+  <ol>
+    <li>Open the Steam client and log in to your account.</li>
+    <li>Press <b><code>Win + R</code></b> to open the "Run" window, and enter <b><code>steam://open/console</code></b>.</li>
+    <li>In the console page, paste the command you copied and press Enter.</li>
+  </ol>
+  <p>The advantage of this method is that <b>you can track the download progress</b> through the Steam client.</p>
+
+  <span><strong style="color: red;">Note:</strong> Be cautious when opening wallpapers of the <strong style="color: red;">Application</strong> or <strong style="color: red;">Web</strong> category, as some of them may contain viruses. 
+    <br><b>This site is not responsible for any losses caused by such actions.</b>
+  </span>
+</div>
+
+
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    const matureOption = document.querySelector('select[name="requiredtags"] option[value="Mature"]');
+    const codeCookie = document.cookie.split('; ').find(row => row.startsWith('code='));
+
+    if (!codeCookie) {
+      matureOption.disabled = true;
+      matureOption.textContent = 'Mature (Requires Invite Code)';
+    }
+  });
+</script>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    const searchForm = document.querySelector('form[action="/search"]');
+    const searchTextInput = searchForm.querySelector('input[name="searchtext"]');
+    const requiredTagsSelect = searchForm.querySelector('select[name="requiredtags"]');
+    const requiredTypeSelect = searchForm.querySelector('select[name="requiredtype"]');
+    const browseSortSelect = searchForm.querySelector('select[name="browsesort"]');
+    const pageInput = searchForm.querySelector('input[name="p"]');
+
+        // 监听 searchtext 输入框的变化
+    searchTextInput.addEventListener('input', function() {
+      // 重置 p 为 1
+      pageInput.value = 1;
+    });
+
+    // 监听下拉菜单的变化
+    [requiredTagsSelect, requiredTypeSelect, browseSortSelect].forEach(select => {
+      select.addEventListener('change', function() {
+        // 重置 p 为 1
+        pageInput.value = 1;
+      });
+    });
+
+    // 解析当前 URL 中的参数
+    function getUrlParams() {
+      const params = new URLSearchParams(window.location.search);
+      return {
+        searchtext: params.get('searchtext'),
+        requiredtags: params.get('requiredtags'),
+        requiredtype: params.get('requiredtype'),
+        browsesort: params.get('browsesort'),
+        p: params.get('p'),
+      };
+    }
+
+    // 检查 URL 参数是否发生变化
+    function checkUrlParams() {
+      const currentParams = getUrlParams();
+      const initialParams = { ...currentParams }; // 保存初始参数
+
+      // 监听 URL 变化
+      window.addEventListener('popstate', function() {
+        const newParams = getUrlParams();
+
+        // 如果 searchtext、requiredtags、requiredtype 或 browsesort 发生变化
+        if (
+          newParams.searchtext !== initialParams.searchtext ||
+          newParams.requiredtags !== initialParams.requiredtags ||
+          newParams.requiredtype !== initialParams.requiredtype ||
+          newParams.browsesort !== initialParams.browsesort
+        ) {
+          // 重置 p 为 1
+          const url = new URL(window.location.href);
+          url.searchParams.set('p', 1);
+          window.history.replaceState(null, '', url.toString());
+
+          // 更新表单中的 p 值
+          pageInput.value = 1;
+        }
+      });
+    }
+
+    // 初始化检查
+    checkUrlParams();
+  });
+</script>

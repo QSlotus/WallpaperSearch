@@ -1,0 +1,342 @@
+body {
+  font-family: 'Merriweather', sans-serif;
+
+  }
+  
+  .search-container {
+    margin-bottom: 20px;
+  }
+  
+  .results-container {
+    display: flex;
+    flex-wrap: wrap;
+  }
+  
+  .result-item {
+    width: 200px;
+    margin: 10px;
+    text-align: center;
+  }
+  
+  .result-item img {
+    width: 100%;
+    height: auto;
+  }
+  
+  .item-detail {
+    max-width: 600px;
+    margin: 0 auto;
+  }
+  
+  .item-detail img {
+    max-width: 100%;
+    height: auto;
+    display: block;
+    margin: 0 auto;
+  }
+  
+  .pagination {
+    margin-top: 20px;
+    text-align: center;
+  }
+  
+  .pagination a {
+    margin: 0 5px;
+    text-decoration: none;
+    color: #007bff;
+  }
+  
+  .pagination a:hover {
+    text-decoration: underline;
+  }
+
+  /* 自定义样式 */
+.search-container {
+  margin-bottom: 2rem;
+}
+
+/* 自定义 item-detail 样式 */
+.card {
+  max-width: 800px;
+  margin: 0 auto;
+  border: none;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.card-title {
+  font-size: 1.3rem;
+  font-weight: bold;
+  margin-bottom: 1rem;
+}
+
+.card-text h5 {
+  font-size: 1.25rem;
+  font-weight: bold;
+  margin-bottom: 1rem;
+}
+
+.card-text p {
+  font-size: 1rem;
+  line-height: 1.6;
+}
+
+.list-group-item {
+  font-size: 1rem;
+  padding: 0.75rem 1.25rem;
+}
+
+code {
+  display: block;
+  padding: 1rem;
+  background-color: #f8f9fa;
+  border-radius: 4px;
+  font-family: 'Source Code Pro';
+  font-size: 0.9rem;
+  margin-top: 0.5rem;
+}
+
+/* 自定义页脚样式 */
+.footer {
+  width: 100%;
+  background-color: #f8f9fa; /* 浅灰色背景 */
+  border-top: 1px solid #e9ecef; /* 顶部边框 */
+  padding: 1rem 0; /* 增加内边距 */
+  margin-top: auto; /* 增加顶部外边距 */
+}
+
+.footer .text-muted {
+  font-size: 14px;
+  color: #6c757d; /* 灰色文字 */
+}
+
+/* 自定义描述部分的样式 */
+.description-blockquote {
+  margin: 1rem 0;
+  padding: 1rem 1.5rem;
+  background-color: #f8f9fa; /* 浅灰色背景 */
+  border-left: 4px solid #6c757d; /* 左侧边框 */
+  color: #6c757d; /* 灰色文字 */
+  font-style: italic; /* 斜体 */
+  line-height: 1.6; /* 行高 */
+  font-size: 1rem; /* 字体大小 */
+  border-radius: 4px; /* 圆角 */
+}
+
+.description-blockquote br {
+  display: block; /* 让换行符生效 */
+  content: ""; /* 清除默认内容 */
+  margin-bottom: 0.5rem; /* 增加换行间距 */
+}
+
+.description-container {
+  padding-left: 1.25rem;
+}
+
+/* 自定义 Steam 创意工坊链接按钮样式 */
+.btn-steam {
+  background-color: #171a21; /* Steam 主题色 */
+  color: #fff; /* 白色文字 */
+  border: none;
+  padding-left: 10px;
+  padding-top: 1px;
+  padding-right: 10px;
+  padding-bottom: 1px;
+  font-size: 1rem;
+  border-radius: 4px;
+  text-decoration: none;
+  display: inline-block;
+  transition: background-color 0.3s ease;
+}
+
+.btn-steam:hover {
+  background-color: #1b2838; /* 悬停时的颜色 */
+  color: #fff;
+  text-decoration: none;
+}
+
+/* 自定义说明性文字样式 */
+.home-description {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 1rem;
+  background-color: #f8f9fa; /* 浅灰色背景 */
+  border-radius: 8px; /* 圆角 */
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); /* 阴影 */
+  margin-bottom: 20px;
+}
+
+.home-description h2 {
+  font-size: 1.75rem;
+  font-weight: bold;
+  margin-bottom: 1rem;
+}
+
+.home-description p {
+  font-size: 1rem;
+  line-height: 1.6;
+  margin-bottom: 1rem;
+}
+
+.home-description ul {
+  margin-bottom: 1rem;
+  padding-left: 1.5rem;
+}
+
+.home-description ul li {
+  margin-bottom: 0.5rem;
+}
+
+.home-description a {
+  color: #007bff; /* 链接颜色 */
+  text-decoration: none;
+}
+
+.home-description a:hover {
+  text-decoration: underline;
+}
+
+.home-description code {
+  display: inline; /* 改为行内显示 */
+  padding: 0.2em 0.4em; /* 减少 padding，使其更适合行内显示 */
+  background-color: #f8f9fa; /* 保持背景色 */
+  border-radius: 4px; /* 圆角 */
+  font-family: 'Source Code Pro', monospace; /* 使用等宽字体 */
+  font-size: 0.9rem; /* 字体大小 */
+  color: #d63384; /* 可选：为代码块添加颜色，使其更突出 */
+  border: 1px solid #e9ecef; /* 可选：添加边框 */
+}
+
+
+/* h1 样式 */
+.bb_h1 {
+  font-size: 20px; /* Steam 风格的字体大小 */
+  line-height: 23px; /* Steam 风格的行高 */
+  font-weight: bold; /* 设置字体粗细 */
+  margin: 0.75rem 0; /* 设置外边距 */
+  color: #333; /* 设置字体颜色 */
+  border-bottom: 1px solid #ddd; /* 添加底部边框 */
+  padding-bottom: 0.5rem; /* 设置底部内边距 */
+}
+
+/* h2 样式 */
+.bb_h2 {
+  font-size: 18px; /* Steam 风格的字体大小 */
+  line-height: 21px; /* Steam 风格的行高 */
+  font-weight: bold;
+  margin: 0.6rem 0;
+  color: #333;
+  border-bottom: 0.5px solid #ddd;
+  padding-bottom: 0.4rem;
+}
+
+/* h3 样式 */
+.bb_h3 {
+  font-size: 16px; /* Steam 风格的字体大小 */
+  line-height: 19px; /* Steam 风格的行高 */
+  font-weight: bold;
+  margin: 0.5rem 0;
+  color: #333;
+}
+
+
+/* 自定义弹窗样式 */
+.modal {
+  display: none; /* 默认隐藏 */
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.5); /* 半透明背景 */
+  justify-content: center;
+  align-items: center;
+  z-index: 1000; /* 确保弹窗在最上层 */
+}
+
+.modal-content {
+  background-color: #fff;
+  padding: 20px;
+  border-radius: 8px;
+  max-width: 400px;
+  width: 100%;
+  text-align: center;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.modal-actions {
+  /* margin-top: 5px; */
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+}
+
+.modal-actions .btn {
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.modal-actions .btn-primary {
+  background-color: #007bff;
+  color: #fff;
+  border: none;
+}
+
+.modal-actions .btn-secondary {
+  background-color: #6c757d;
+  color: #fff;
+  border: none;
+}
+
+
+/* 创作者卡片样式 */
+.creator-card .card  {
+  max-width: 400px;
+  /* margin: 0 auto;  */
+  /* border: 1px solid #ddd; */
+  /* border-radius: 8px; */
+  /* box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); */
+}
+
+.creator-card-body {
+  padding-left: 1.25rem;
+}
+
+
+.creator-avatar {
+  border: 1px solid black;
+}
+
+.creator-avatar-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #666;
+  font-size: 14px;
+}
+
+
+/* 自定义 Steam Profile 按钮样式 */
+.btn-steam-profile {
+  background-color: #171a21; /* Steam 主题色 */
+  color: #fff; /* 白色文字 */
+  border: none;
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem; /* 14px */
+  border-radius: 4px;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem; /* 图标和文字之间的间距 */
+  transition: background-color 0.3s ease;
+}
+
+.btn-steam-profile:hover {
+  background-color: #1b2838; /* 悬停时的颜色 */
+  color: #fff;
+  text-decoration: none;
+}
+
+.btn-steam-profile i {
+  font-size: 0.875rem; /* 图标大小 */
+}

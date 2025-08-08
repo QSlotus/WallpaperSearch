@@ -1,0 +1,192 @@
+<div class="card">
+  <div class="card-body">
+    <!-- 标题 -->
+    <h1 class="card-title"><%= item.title %></h1>
+
+    <!-- 图片 -->
+    <div class="text-center mb-4">
+      <div style="width: 200px; height: 200px; overflow: hidden; margin: 0 auto;">
+        <img src="<%= item.previewImage %>" class="img-fluid" alt="<%= item.title %>" style="width: 100%; height: 100%; object-fit: cover;">
+      </div>
+    </div>
+
+    <!-- 描述 -->
+    <div class="card-text mb-4">
+      <h5>Description:</h5>
+      <div class="description-container">
+        <blockquote class="description-blockquote" id="description-blockquote">
+          <%- item.description %>
+        </blockquote>
+      </div>
+    </div>
+
+    <!-- 创作者信息卡片 -->
+    <div class="card-text mb-4">
+      <h5>Creator Info:</h5>
+      <div class="creator-card">
+        <div class="creator-card-body d-flex align-items-center">
+          <!-- 头像和头像框容器 -->
+          <div style="position: relative; width: 72px; height: 72px; margin-right: 15px;">
+            <!-- 头像 -->
+            <% if (item.creatorAvatarUrl) { %>
+              <img src="<%= item.creatorAvatarUrl %>" alt="Creator Avatar" style="width: 100%; height: 100%; object-fit: cover;">
+            <% } else { %>
+              <div class="creator-avatar-placeholder" style="width: 100%; height: 100%; background-color: #ccc; "></div>
+            <% } %>
+            <!-- 头像框 -->
+            <% if (item.creatorAvatarFrameUrl) { %>
+              <img src="<%= item.creatorAvatarFrameUrl %>" alt="Creator Avatar Frame" style="position: absolute; top: -8px; left: -8px; width: 88px; height: 88px; object-fit: cover;">
+            <% } %>
+          </div>
+          <!-- 创作者昵称和个人主页链接 -->
+          <div>
+            <p class="mb-0"><b><%= item.creatorName || 'Unknown Creator' %></b></p>
+            <% if (item.creatorProfileUrl) { %>
+              <a href="<%= item.creatorProfileUrl %>" target="_blank" class="btn btn-steam-profile btn-sm mt-2">
+                Profile
+              </a>
+            <% } else { %>
+              <p class="text-muted mb-0">Profile link not available</p>
+            <% } %>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 文件信息 -->
+    <div class="card-text mb-4">
+      <h5>Wallpaper info:</h5>
+      <ul class="list-group list-group-flush">
+        <li class="list-group-item">
+          Type: 
+          <b>
+          <% if (item.type === 'Application' || item.type === 'Web') { %>
+            <span style="color: red;"><%= item.type %></span>
+          <% } else { %>
+            <span style="color: green;"><%= item.type %></span>
+          <% } %>
+          </b>
+        </li>
+        <li class="list-group-item">
+          Age Rating: 
+          <b>
+          <% if (item.ageRating === 'Everyone') { %>
+            <span style="color: green;"><%= item.ageRating %></span>
+          <% } else if (item.ageRating === 'Questionable') { %>
+            <span style="color: orange;"><%= item.ageRating %></span>
+          <% } else if (item.ageRating === 'Mature') { %>
+            <span style="color: red;"><%= item.ageRating %></span>
+          <% } else { %>
+            <%= item.ageRating %>
+          <% } %>
+          </b>
+        </li>
+        <li class="list-group-item">Size: <b><%= item.fileSize %></b></li>
+        <li class="list-group-item">Current Subscribers: <b><%= item.currentSubscribers || 'N/A' %></b></li>
+        <li class="list-group-item">Current Favorites: <b><%= item.currentFavorites || 'N/A' %></b></li>
+        <li class="list-group-item">Create time: <%= item.timeCreated %></li>
+        <li class="list-group-item">Update time: <%= item.timeUpdated %></li>
+        <li class="list-group-item">
+          <b>Steam Workshop Url:</b>&nbsp;
+          <a href="https://steamcommunity.com/sharedfiles/filedetails/?id=<%= item.id %>" target="_blank">
+            <b>Steam Workshop :: <%= item.title %></b>
+          </a>
+        </li>
+      </ul>
+    </div>
+
+    <!-- <div class="card-text" style="display: flex; align-items: center; gap: 10px;">
+      <h5 style="margin: 0;">Steam Workshop Link:</h5>
+      <a href="https://steamcommunity.com/sharedfiles/filedetails/?id=<%= item.id %>" target="_blank" class="btn btn-steam">
+        Visit
+      </a>
+    </div> -->
+    
+    <!-- SteamCMD 命令 -->
+    <div class="card-text">
+      <h5>Mysterious command:</h5>
+      <div style="position: relative;">
+        <code id="steamcmd-command">workshop_download_item 431960 <%= item.id %></code>
+        <button id="copy-button" class="btn btn-sm btn-outline-secondary" style="position: absolute; top: 0; right: 0;">
+          Copy
+        </button>
+      </div>
+    </div>
+    <!-- 自定义弹窗 -->
+    <div id="custom-modal" class="modal">
+      <div class="modal-content">
+        <p>This URL is from the <b><u>Steam Workshop description</u></b> and is <b>not managed by this site</b>. <b>Please proceed with caution.</b> 
+          <br><b style="color: red;">Any losses incurred are not the responsibility of this site.</b></p>
+        <div class="modal-actions">
+          <a id="modal-confirm-link" href="#" target="_blank" class="btn btn-primary">Continue</a>
+          <button id="modal-cancel-btn" class="btn btn-secondary">Cancel</button>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      document.getElementById('copy-button').addEventListener('click', function() {
+        const commandText = document.getElementById('steamcmd-command').innerText;
+        const copyButton = document.getElementById('copy-button');
+
+        navigator.clipboard.writeText(commandText).then(function() {
+          // 修改按钮文字和样式
+          copyButton.innerText = 'Copied!';
+          copyButton.classList.remove('btn-outline-secondary');
+          copyButton.classList.add('btn-success');
+
+          // 2秒后恢复按钮状态
+          setTimeout(function() {
+            copyButton.innerText = 'Copy';
+            copyButton.classList.remove('btn-success');
+            copyButton.classList.add('btn-outline-secondary');
+          }, 2000); // 2秒后恢复
+        }).catch(function(err) {
+          console.error('Failed to copy text: ', err);
+        });
+      });
+    </script>
+    <script>
+      // 获取弹窗相关元素
+      const modal = document.getElementById('custom-modal');
+      const confirmLink = document.getElementById('modal-confirm-link');
+      const cancelBtn = document.getElementById('modal-cancel-btn');
+
+      // 监听描述中的所有链接点击事件
+      document.getElementById('description-blockquote').addEventListener('click', function(event) {
+        // 检查点击的元素是否是 <a> 标签或其子元素（如图片）
+        const anchor = event.target.closest('a');
+        if (anchor) {
+          event.preventDefault(); // 阻止默认的跳转行为
+
+          const url = anchor.href; // 获取链接地址
+
+          // 设置确认链接的 href
+          confirmLink.href = url;
+
+          // 显示弹窗
+          modal.style.display = 'flex';
+        }
+      });
+
+      // 监听确认按钮点击事件
+      confirmLink.addEventListener('click', function() {
+        // 隐藏弹窗
+        modal.style.display = 'none';
+      });
+
+      // 监听取消按钮点击事件
+      cancelBtn.addEventListener('click', function() {
+        // 隐藏弹窗
+        modal.style.display = 'none';
+      });
+
+      // 点击弹窗外部关闭弹窗
+      window.addEventListener('click', function(event) {
+        if (event.target === modal) {
+          modal.style.display = 'none';
+        }
+      });
+    </script>
+  </div>
+</div>
