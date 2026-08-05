@@ -1,0 +1,54 @@
+<% const currentSearchText = typeof searchtext !== 'undefined' ? searchtext : ''; %>
+<% const currentRequiredTags = typeof requiredtags !== 'undefined' ? requiredtags : 'Everyone'; %>
+<% const currentRequiredType = typeof requiredtype !== 'undefined' ? requiredtype : ''; %>
+<% const currentBrowseSort = typeof browsesort !== 'undefined' ? browsesort : 'textsearch'; %>
+<% const currentPage = typeof page !== 'undefined' ? page : 1; %>
+
+<form action="/search" method="get" class="search-form-main">
+  <div class="search-query-row">
+    <label class="search-query-field">
+      <i data-lucide="search" aria-hidden="true"></i>
+      <span class="sr-only">Search wallpapers</span>
+      <input type="search" name="searchtext" value="<%= currentSearchText %>" placeholder="Search wallpapers" autocomplete="off">
+    </label>
+    <button type="submit" class="button button-primary search-submit">
+      <i data-lucide="search" aria-hidden="true"></i>
+      <span>Search</span>
+    </button>
+  </div>
+
+  <div class="filter-grid">
+    <label class="filter-control">
+      <span>Audience</span>
+      <select name="requiredtags">
+        <option value="Everyone" <%= currentRequiredTags === 'Everyone' ? 'selected' : '' %>>Everyone</option>
+        <option value="Questionable" <%= currentRequiredTags === 'Questionable' ? 'selected' : '' %>>Questionable</option>
+        <option value="Mature" <%= currentRequiredTags === 'Mature' ? 'selected' : '' %>>Mature</option>
+      </select>
+    </label>
+    <label class="filter-control">
+      <span>Type</span>
+      <select name="requiredtype">
+        <option value="" <%= currentRequiredType === '' ? 'selected' : '' %>>All types</option>
+        <option value="Scene" <%= currentRequiredType === 'Scene' ? 'selected' : '' %>>Scene</option>
+        <option value="Video" <%= currentRequiredType === 'Video' ? 'selected' : '' %>>Video</option>
+        <option value="Application" <%= currentRequiredType === 'Application' ? 'selected' : '' %>>Application</option>
+        <option value="Web" <%= currentRequiredType === 'Web' ? 'selected' : '' %>>Web</option>
+      </select>
+    </label>
+    <label class="filter-control filter-control-wide">
+      <span>Sort by</span>
+      <select name="browsesort">
+        <option value="textsearch" <%= currentBrowseSort === 'textsearch' ? 'selected' : '' %>>Relevance</option>
+        <option value="totaluniquesubscribers" <%= currentBrowseSort === 'totaluniquesubscribers' ? 'selected' : '' %>>Most subscribed</option>
+        <option value="mostrecent" <%= currentBrowseSort === 'mostrecent' ? 'selected' : '' %>>Most recent</option>
+        <option value="trend&days=1" <%= currentBrowseSort === 'trend&days=1' ? 'selected' : '' %>>Trending today</option>
+        <option value="trend&days=7" <%= currentBrowseSort === 'trend&days=7' ? 'selected' : '' %>>Trending 7 days</option>
+        <option value="trend&days=30" <%= currentBrowseSort === 'trend&days=30' ? 'selected' : '' %>>Trending 30 days</option>
+        <option value="trend&days=365" <%= currentBrowseSort === 'trend&days=365' ? 'selected' : '' %>>Trending year</option>
+        <option value="trend&days=-1" <%= currentBrowseSort === 'trend&days=-1' ? 'selected' : '' %>>Trending all time</option>
+      </select>
+    </label>
+  </div>
+  <input type="hidden" name="p" value="<%= currentPage %>">
+</form>

@@ -3,47 +3,51 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="dark light">
   <title><%= title %></title>
-  <!-- Bootstrap CSS -->
-  <link href="https://fastly.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-  <link href="https://fonts.font.im/css?family=Merriweather|Source+Code+Pro" rel="stylesheet">
   <link href="/favicon.ico" rel="shortcut icon">
-  <!-- <link rel="stylesheet" href="https://cdnjs.loli.net/ajax/libs/font-awesome/5.15.4/css/fontawesome.min.css"> -->
-  <!-- <link rel="stylesheet" href="https://cdnjs.loli.net/ajax/libs/font-awesome/5.15.4/css/brands.min.css"> -->
-  <!-- <link rel="stylesheet" href="https://cdnjs.loli.net/ajax/libs/font-awesome/5.15.4/css/solid.min.css"> -->
   <link rel="stylesheet" href="/styles.css">
-  <style>
-    /* Flexbox 布局 */
-    html, body {
-      height: 100%;
-      margin: 0;
-      display: flex;
-      flex-direction: column;
-    }
-    .container {
-      flex: 1; /* 让内容区域占据剩余空间 */
-    }
-    .footer {
-      flex-shrink: 0; /* 防止页脚被压缩 */
-    }
-  </style>
+  <script>
+    (function() {
+      const savedTheme = localStorage.getItem('wallpaper-search-theme');
+      document.documentElement.dataset.theme = savedTheme || 'dark';
+    })();
+  </script>
 </head>
 <body>
-  <%- include('navbar') %> <!-- 导航栏组件 -->
-  <div class="container mt-4">
-    <%- body %> <!-- 页面内容 -->
+  <div class="app-shell">
+    <%- include('navbar') %>
+    <main class="app-main" id="main-content">
+      <%- body %>
+    </main>
+    <%- include('aside') %>
   </div>
 
-  <!-- 页脚 -->
-  <footer class="footer mt-auto py-3 bg-light">
-    <div class="container text-center">
-      <span class="text-muted">
-        &copy; 2025 <em>Wallpaper Search.</em> All rights reserved.
-      </span>
-    </div>
-  </footer>
+  <script src="https://fastly.jsdelivr.net/npm/lucide@0.468.0/dist/umd/lucide.min.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      if (window.lucide) window.lucide.createIcons({ attrs: { 'stroke-width': 2 } });
 
-  <!-- Bootstrap JS -->
-  <script src="https://fastly.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+      const currentPath = window.location.pathname;
+      document.querySelectorAll('[data-nav-path]').forEach(function(link) {
+        const path = link.getAttribute('data-nav-path');
+        const isActive = path === '/' ? currentPath === '/' : currentPath.startsWith(path);
+        link.classList.toggle('is-active', isActive);
+        if (isActive) link.setAttribute('aria-current', 'page');
+      });
+
+      document.querySelectorAll('[data-theme-toggle]').forEach(function(button) {
+        button.addEventListener('click', function() {
+          const nextTheme = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+          document.documentElement.dataset.theme = nextTheme;
+          localStorage.setItem('wallpaper-search-theme', nextTheme);
+          document.querySelectorAll('[data-theme-icon]').forEach(function(icon) {
+            icon.setAttribute('data-lucide', nextTheme === 'dark' ? 'sun' : 'moon');
+          });
+          if (window.lucide) window.lucide.createIcons({ attrs: { 'stroke-width': 2 } });
+        });
+      });
+    });
+  </script>
 </body>
 </html>

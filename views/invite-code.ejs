@@ -1,24 +1,49 @@
-<div class="container mt-4">
-  <h2>Invite Code</h2>
-
-  <% if (typeof error !== 'undefined') { %>
-    <div class="alert alert-danger" role="alert">
-      <%= error %>
+<header class="page-header">
+  <div class="page-header-main">
+    <a class="icon-button" href="/" aria-label="Back to home" title="Back to home">
+      <i data-lucide="arrow-left" aria-hidden="true"></i>
+    </a>
+    <div>
+      <h1>Invite Code</h1>
+      <p>Mature content access</p>
     </div>
-  <% } %>
+  </div>
+</header>
 
-  <% if (typeof code !== 'undefined' && code === correctInviteCode) { %>
-    <div class="alert alert-success" role="alert">
-      Congratulations, you have unlocked the search permission for Mature content.
+<% if (typeof error !== 'undefined') { %>
+  <div class="notice notice-danger" role="alert">
+    <i data-lucide="circle-alert" aria-hidden="true"></i>
+    <span><%= error %></span>
+  </div>
+<% } %>
+
+<% if (typeof code !== 'undefined' && code === correctInviteCode) { %>
+  <div class="notice notice-success" role="status">
+    <i data-lucide="badge-check" aria-hidden="true"></i>
+    <span>Mature content search is unlocked on this browser.</span>
+  </div>
+  <section class="empty-state">
+    <div class="empty-state-inner">
+      <div class="empty-state-icon"><i data-lucide="shield-check" aria-hidden="true"></i></div>
+      <h2>Access unlocked</h2>
+      <p>You can now select Mature in the audience filter.</p>
+      <a class="button button-primary" href="/">Return home</a>
     </div>
-  <% } else { %>
-    <p>Please enter your invite code to unlock the search permission for Mature content.</p>
-    <form action="/submit-invite-code" method="post">
-      <div class="mb-3">
-        <label for="inviteCode" class="form-label"><b>Invite Code</b></label>
-        <input type="text" class="form-control" id="inviteCode" name="inviteCode" required>
+  </section>
+<% } else { %>
+  <section class="auth-content">
+    <p>Enter your invite code to unlock the Mature option in Wallpaper Search.</p>
+    <form class="invite-form" action="/submit-invite-code" method="post">
+      <label class="text-field" for="inviteCode">
+        <span>Invite code</span>
+        <input type="text" id="inviteCode" name="inviteCode" required autocomplete="off" autofocus>
+      </label>
+      <div class="auth-actions">
+        <button type="submit" class="button button-primary">
+          <i data-lucide="unlock" aria-hidden="true"></i>
+          Unlock access
+        </button>
       </div>
-      <button type="submit" class="btn btn-primary">Submit</button>
     </form>
-  <% } %>
-</div>
+  </section>
+<% } %>

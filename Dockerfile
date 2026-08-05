@@ -1,10 +1,8 @@
-FROM alpine:3.21
+FROM node:22-alpine
 WORKDIR /app
-RUN apk add --no-cache nodejs python3 py3-pip supervisor curl bash \
-    && curl -L https://github.com/odise/go-cron/releases/download/v0.0.7/go-cron-linux.gz | zcat > /usr/local/bin/go-cron \
-    && chmod +x /usr/local/bin/go-cron
+COPY package*.json ./
+RUN npm install --omit=dev
 COPY . .
-RUN chmod +x /app/run_once.sh \
-    && pip3 install --no-cache-dir --break-system-packages requests python-dotenv \
-    && apk del py3-pip curl
-CMD ["/usr/bin/supervisord", "-c", "/app/supervisord.conf"]
+ENV NODE_ENV=production
+EXPOSE 3000
+CMD ["npm", "start"]

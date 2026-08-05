@@ -1,0 +1,57 @@
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    const matureOption = document.querySelector('select[name="requiredtags"] option[value="Mature"]');
+    const codeCookie = document.cookie.split('; ').find(row => row.startsWith('code='));
+
+    if (!codeCookie && matureOption) {
+      matureOption.disabled = true;
+      matureOption.textContent = 'Mature (Requires Invite Code)';
+    }
+
+    const searchForm = document.querySelector('main form[action="/search"]');
+    if (!searchForm) return;
+
+    const searchTextInput = searchForm.querySelector('input[name="searchtext"]');
+    const requiredTagsSelect = searchForm.querySelector('select[name="requiredtags"]');
+    const requiredTypeSelect = searchForm.querySelector('select[name="requiredtype"]');
+    const browseSortSelect = searchForm.querySelector('select[name="browsesort"]');
+    const pageInput = searchForm.querySelector('input[name="p"]');
+
+    searchTextInput.addEventListener('input', function() {
+      pageInput.value = 1;
+    });
+
+    [requiredTagsSelect, requiredTypeSelect, browseSortSelect].forEach(function(select) {
+      select.addEventListener('change', function() {
+        pageInput.value = 1;
+      });
+    });
+
+    function getUrlParams() {
+      const params = new URLSearchParams(window.location.search);
+      return {
+        searchtext: params.get('searchtext'),
+        requiredtags: params.get('requiredtags'),
+        requiredtype: params.get('requiredtype'),
+        browsesort: params.get('browsesort'),
+        p: params.get('p')
+      };
+    }
+
+    const initialParams = getUrlParams();
+    window.addEventListener('popstate', function() {
+      const newParams = getUrlParams();
+      if (
+        newParams.searchtext !== initialParams.searchtext ||
+        newParams.requiredtags !== initialParams.requiredtags ||
+        newParams.requiredtype !== initialParams.requiredtype ||
+        newParams.browsesort !== initialParams.browsesort
+      ) {
+        const url = new URL(window.location.href);
+        url.searchParams.set('p', 1);
+        window.history.replaceState(null, '', url.toString());
+        pageInput.value = 1;
+      }
+    });
+  });
+</script>

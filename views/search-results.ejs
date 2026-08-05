@@ -1,97 +1,91 @@
+<header class="page-header">
+  <div class="page-header-main">
+    <a class="icon-button" href="/" aria-label="Back to home" title="Back to home">
+      <i data-lucide="arrow-left" aria-hidden="true"></i>
+    </a>
+    <div>
+      <h1>Search</h1>
+      <p><%= searchtext ? 'Results for "' + searchtext + '"' : 'Browse Workshop items' %></p>
+    </div>
+  </div>
+</header>
+
 <% if (typeof error !== 'undefined') { %>
-  <div class="alert alert-danger" role="alert">
-    <%= error %>
-    <a href="/invite-code" class="alert-link">Click here to enter the invite code</a>.
+  <div class="notice notice-danger" role="alert">
+    <i data-lucide="circle-alert" aria-hidden="true"></i>
+    <div>
+      <%= error %>
+      <a href="/invite-code">Enter an invite code</a>.
+    </div>
   </div>
 <% } %>
 
-<div class="search-container mb-4">
-  <form action="/search" method="get" class="row g-3">
-    <div class="col-md-6">
-      <input type="text" name="searchtext" value="<%= searchtext %>" class="form-control" placeholder="Search for wallpapers...">
-    </div>
-    <div class="col-md-2">
-      <select name="requiredtags" class="form-select">
-        <!-- <option value="" <%= requiredtags === '' ? 'selected' : '' %>>All Ages</option> -->
-        <option value="Everyone" <%= requiredtags === 'Everyone' ? 'selected' : '' %>>Everyone</option>
-        <option value="Questionable" <%= requiredtags === 'Questionable' ? 'selected' : '' %>>Questionable</option>
-        <option value="Mature" <%= requiredtags === 'Mature' ? 'selected' : '' %>>Mature</option>
-      </select>
-    </div>
-    <div class="col-md-2">
-      <select name="requiredtype" class="form-select">
-        <option value="" <%= requiredtype === '' ? 'selected' : '' %>>All Types</option>
-        <option value="Scene" <%= requiredtype === 'Scene' ? 'selected' : '' %>>Scene</option>
-        <option value="Video" <%= requiredtype === 'Video' ? 'selected' : '' %>>Video</option>
-        <option value="Application" <%= requiredtype === 'Application' ? 'selected' : '' %>>Application</option>
-        <option value="Web" <%= requiredtype === 'Web' ? 'selected' : '' %>>Web</option>
-      </select>
-    </div>
-    <div class="col-md-2">
-      <select name="browsesort" class="form-select">
-        <option value="textsearch" <%= browsesort === 'textsearch' ? 'selected' : '' %>>Relevance</option>
-        <option value="totaluniquesubscribers" <%= browsesort === 'totaluniquesubscribers' ? 'selected' : '' %>>Most Subscribed</option>
-        <option value="mostrecent" <%= browsesort === 'mostrecent' ? 'selected' : '' %>>Most Recent</option>
-        <option value="trend&days=1" <%= browsesort === 'trend&days=1' ? 'selected' : '' %>>Trending Today</option>
-        <option value="trend&days=7" <%= browsesort === 'trend&days=7' ? 'selected' : '' %>>Trending Last 7 Days</option>
-        <option value="trend&days=30" <%= browsesort === 'trend&days=30' ? 'selected' : '' %>>Trending Last 30 Days</option>
-        <option value="trend&days=365" <%= browsesort === 'trend&days=365' ? 'selected' : '' %>>Trending Last 365 Days</option>
-        <option value="trend&days=-1" <%= browsesort === 'trend&days=-1' ? 'selected' : '' %>>Trending All Time</option>
-      </select>
-    </div>
-    <div class="col-md-12">
-      <input type="hidden" name="p" value="<%= page %>">
-      <button type="submit" class="btn btn-primary">Search</button>
-    </div>
-  </form>
-</div>
-<div class="row">
-  <% items.forEach(item => { %>
-    <div class="col-md-4 mb-4">
-      <div class="card">
-        <!-- 图片大小限制为 200x200 -->
-        <div style="width: 200px; height: 200px; overflow: hidden; margin: 0 auto;">
-          <img src="<%= item.previewImage %>" class="img-fluid" alt="<%= item.title %>" style="width: 100%; height: 100%; object-fit: cover;">
-        </div>
-        <div class="card-body">
-          <h5 class="card-title"><%= item.title %></h5>
-          <p class="card-text">By: <%= item.authorName %></p>
-          <a href="/item/<%= item.sharedfileId %>" class="btn btn-primary">View Details</a>
-        </div>
-      </div>
-    </div>
-  <% }) %>
+<section class="search-section" aria-label="Refine wallpaper search">
+  <%- include('search-form') %>
+</section>
+
+<div class="results-summary">
+  <span><strong><%= items.length %></strong> items on this page</span>
+  <span>Page <%= page %> of <%= maxPage %></span>
 </div>
 
+<% if (items.length > 0) { %>
+  <section class="results-feed" aria-label="Wallpaper results">
+    <% items.forEach(item => { %>
+      <article class="wallpaper-post">
+        <a class="wallpaper-post-link" href="/item/<%= item.sharedfileId %>">
+          <div class="wallpaper-preview">
+            <img src="<%= item.previewImage %>" alt="<%= item.title %>" loading="lazy">
+          </div>
+          <div class="wallpaper-post-content">
+            <h2 class="wallpaper-post-title"><%= item.title %></h2>
+            <p class="wallpaper-post-author">by <%= item.authorName %></p>
+            <span class="wallpaper-post-action">
+              View details
+              <i data-lucide="arrow-up-right" aria-hidden="true"></i>
+            </span>
+          </div>
+        </a>
+      </article>
+    <% }) %>
+  </section>
+<% } else if (typeof error === 'undefined') { %>
+  <section class="empty-state">
+    <div class="empty-state-inner">
+      <div class="empty-state-icon"><i data-lucide="search-x" aria-hidden="true"></i></div>
+      <h2>No wallpapers found</h2>
+      <p>Try another search term or adjust the audience, type, and sort filters.</p>
+    </div>
+  </section>
+<% } %>
 
 <% if (maxPage > 1) { %>
-  <nav aria-label="Page navigation">
-    <ul class="pagination justify-content-center">
+  <nav class="pagination-wrap" aria-label="Search result pages">
+    <ul class="pagination">
       <% if (page > 1) { %>
-        <!-- 如果 p > 1，显示 "First Page" 按钮 -->
         <% if (page > 2) { %>
-          <li class="page-item">
-            <a class="page-link" href="/search?searchtext=<%= encodeURIComponent(searchtext) %>&requiredtags=<%= requiredtags %>&requiredtype=<%= requiredtype %>&section=<%= section %>&p=1&browsesort=<%= browsesort %>">First Page</a>
+          <li>
+            <a class="page-link" href="/search?searchtext=<%= encodeURIComponent(searchtext) %>&requiredtags=<%= requiredtags %>&requiredtype=<%= requiredtype %>&section=<%= section %>&p=1&browsesort=<%= browsesort %>">First</a>
           </li>
         <% } %>
-        <!-- 保留原有的 "Previous" 按钮 -->
-        <li class="page-item">
-          <a class="page-link" href="/search?searchtext=<%= encodeURIComponent(searchtext) %>&requiredtags=<%= requiredtags %>&requiredtype=<%= requiredtype %>&section=<%= section %>&p=<%= parseInt(page) - 1 %>&browsesort=<%= browsesort %>">Previous</a>
+        <li>
+          <a class="page-link" href="/search?searchtext=<%= encodeURIComponent(searchtext) %>&requiredtags=<%= requiredtags %>&requiredtype=<%= requiredtype %>&section=<%= section %>&p=<%= parseInt(page) - 1 %>&browsesort=<%= browsesort %>">
+            <i data-lucide="chevron-left" aria-hidden="true"></i>
+            Previous
+          </a>
         </li>
       <% } %>
-      <!-- 当前页码 -->
-      <li class="page-item disabled">
-        <span class="page-link">Page <%= page %> of <%= maxPage %></span>
-      </li>
+      <li><span class="page-link page-current">Page <%= page %> of <%= maxPage %></span></li>
       <% if (page < maxPage) { %>
-        <!-- 保留原有的 "Next" 按钮 -->
-        <li class="page-item">
-          <a class="page-link" href="/search?searchtext=<%= encodeURIComponent(searchtext) %>&requiredtags=<%= requiredtags %>&requiredtype=<%= requiredtype %>&section=<%= section %>&p=<%= parseInt(page) + 1 %>&browsesort=<%= browsesort %>">Next</a>
+        <li>
+          <a class="page-link" href="/search?searchtext=<%= encodeURIComponent(searchtext) %>&requiredtags=<%= requiredtags %>&requiredtype=<%= requiredtype %>&section=<%= section %>&p=<%= parseInt(page) + 1 %>&browsesort=<%= browsesort %>">
+            Next
+            <i data-lucide="chevron-right" aria-hidden="true"></i>
+          </a>
         </li>
-        <!-- 如果 p < maxPage - 1，显示 "Last Page" 按钮 -->
         <% if (page < maxPage - 1) { %>
-          <li class="page-item">
-            <a class="page-link" href="/search?searchtext=<%= encodeURIComponent(searchtext) %>&requiredtags=<%= requiredtags %>&requiredtype=<%= requiredtype %>&section=<%= section %>&p=<%= maxPage %>&browsesort=<%= browsesort %>">Last Page</a>
+          <li>
+            <a class="page-link" href="/search?searchtext=<%= encodeURIComponent(searchtext) %>&requiredtags=<%= requiredtags %>&requiredtype=<%= requiredtype %>&section=<%= section %>&p=<%= maxPage %>&browsesort=<%= browsesort %>">Last</a>
           </li>
         <% } %>
       <% } %>
@@ -99,81 +93,4 @@
   </nav>
 <% } %>
 
-<script>
-  document.addEventListener('DOMContentLoaded', function() {
-    const matureOption = document.querySelector('select[name="requiredtags"] option[value="Mature"]');
-    const codeCookie = document.cookie.split('; ').find(row => row.startsWith('code='));
-
-    if (!codeCookie) {
-      matureOption.disabled = true;
-      matureOption.textContent = 'Mature (Requires Invite Code)';
-    }
-  });
-</script>
-
-<script>
-  document.addEventListener('DOMContentLoaded', function() {
-    const searchForm = document.querySelector('form[action="/search"]');
-    const searchTextInput = searchForm.querySelector('input[name="searchtext"]');
-    const requiredTagsSelect = searchForm.querySelector('select[name="requiredtags"]');
-    const requiredTypeSelect = searchForm.querySelector('select[name="requiredtype"]');
-    const browseSortSelect = searchForm.querySelector('select[name="browsesort"]');
-    const pageInput = searchForm.querySelector('input[name="p"]');
-
-        // 监听 searchtext 输入框的变化
-    searchTextInput.addEventListener('input', function() {
-      // 重置 p 为 1
-      pageInput.value = 1;
-    });
-
-    // 监听下拉菜单的变化
-    [requiredTagsSelect, requiredTypeSelect, browseSortSelect].forEach(select => {
-      select.addEventListener('change', function() {
-        // 重置 p 为 1
-        pageInput.value = 1;
-      });
-    });
-
-    // 解析当前 URL 中的参数
-    function getUrlParams() {
-      const params = new URLSearchParams(window.location.search);
-      return {
-        searchtext: params.get('searchtext'),
-        requiredtags: params.get('requiredtags'),
-        requiredtype: params.get('requiredtype'),
-        browsesort: params.get('browsesort'),
-        p: params.get('p'),
-      };
-    }
-
-    // 检查 URL 参数是否发生变化
-    function checkUrlParams() {
-      const currentParams = getUrlParams();
-      const initialParams = { ...currentParams }; // 保存初始参数
-
-      // 监听 URL 变化
-      window.addEventListener('popstate', function() {
-        const newParams = getUrlParams();
-
-        // 如果 searchtext、requiredtags、requiredtype 或 browsesort 发生变化
-        if (
-          newParams.searchtext !== initialParams.searchtext ||
-          newParams.requiredtags !== initialParams.requiredtags ||
-          newParams.requiredtype !== initialParams.requiredtype ||
-          newParams.browsesort !== initialParams.browsesort
-        ) {
-          // 重置 p 为 1
-          const url = new URL(window.location.href);
-          url.searchParams.set('p', 1);
-          window.history.replaceState(null, '', url.toString());
-
-          // 更新表单中的 p 值
-          pageInput.value = 1;
-        }
-      });
-    }
-
-    // 初始化检查
-    checkUrlParams();
-  });
-</script>
+<%- include('search-behavior') %>

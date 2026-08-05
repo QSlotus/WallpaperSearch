@@ -1,18 +1,29 @@
-<nav class="navbar navbar-expand-lg navbar-dark bg-dark">
-    <div class="container-fluid">
-      <a class="navbar-brand" href="/">Wallpaper Search</a>
-      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
-        <span class="navbar-toggler-icon"></span>
-      </button>
-      <div class="collapse navbar-collapse" id="navbarNav">
-        <ul class="navbar-nav">
-          <li class="nav-item">
-            <a class="nav-link active" aria-current="page" href="/">Home</a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link active" aria-current="page" href="/invite-code">Invite Code</a>
-          </li>
-        </ul>
-      </div>
-    </div>
-  </nav>
+<header class="app-sidebar" aria-label="Primary navigation">
+  <div class="sidebar-inner">
+    <a class="brand-link" href="/" aria-label="Wallpaper Search home">
+      <span class="brand-mark"><i data-lucide="panels-top-left"></i></span>
+      <span class="brand-name">Wallpaper Search</span>
+    </a>
+
+    <nav class="primary-nav">
+      <a class="nav-link" href="/" data-nav-path="/">
+        <span class="nav-icon"><i data-lucide="home"></i></span>
+        <span class="nav-label">Home</span>
+      </a>
+      <a class="nav-link" href="/search?searchtext=&requiredtags=Everyone&requiredtype=&p=1&browsesort=textsearch" data-nav-path="/search">
+        <span class="nav-icon"><i data-lucide="search"></i></span>
+        <span class="nav-label">Explore</span>
+      </a>
+      <a class="nav-link" href="/invite-code" data-nav-path="/invite-code">
+        <span class="nav-icon"><i data-lucide="key-round"></i></span>
+        <span class="nav-label">Invite Code</span>
+      </a>
+    </nav>
+
+    <div class="sidebar-spacer"></div>
+    <button class="nav-link theme-toggle" type="button" data-theme-toggle aria-label="Toggle color theme" title="Toggle color theme">
+      <span class="nav-icon"><i data-lucide="sun" data-theme-icon></i></span>
+      <span class="nav-label">Display</span>
+    </button>
+  </div>
+</header>

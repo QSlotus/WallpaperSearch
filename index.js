@@ -1,4 +1,5 @@
-require('dotenv').config();
+require('dotenv').config({ path: '.env' });
+require('dotenv').config({ path: '.env.local', override: true });
 const express = require('express');
 const expressLayouts = require('express-ejs-layouts'); // 引入 express-ejs-layouts
 const cookieParser = require('cookie-parser'); // 引入 cookie-parser
@@ -7,6 +8,9 @@ const axios = require('axios');
 const { parseHTML } = require('linkedom');
 const path = require('path');
 const https = require('https');
+const { getCookieHeader, getDecryptedCookies } = require('./lib/cookieManager');
+const { parseSsrItems } = require('./lib/steamSsrParser');
+const { parseSteamProfile } = require('./lib/steamProfileParser');
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -136,10 +140,12 @@ app.post('/submit-invite-code', (req, res) => {
   }
 });
 
-// 启动服务器
-app.listen(port, () => {
-  console.log(`Server is running on http://localhost:${port}`);
-});
+// 本地直接运行时启动监听；Serverless 平台只导出 Express app。
+if (require.main === module) {
+  app.listen(port, () => {
+    console.log(`Server is running on http://localhost:${port}`);
+  });
+}
 
 // 搜索处理函数
 async function handleSearch(searchText, requiredTags, requiredType, section, page, browsesort, req) {
@@ -161,9 +167,10 @@ async function handleSearch(searchText, requiredTags, requiredType, section, pag
   }
 
   try {
+    const cookieHeader = getCookieHeader(await getDecryptedCookies());
     const response = await axios.get(steamUrl, {
       headers: {
-        'Cookie': `sessionid=${process.env.STEAM_SESSIONID}; steamLoginSecure=${process.env.STEAM_LOGIN_SECURE}`,
+        'Cookie': cookieHeader,
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
       },
       httpsAgent: new https.Agent({ rejectUnauthorized: false }), // 禁用 SSL 验证
@@ -200,6 +207,7 @@ async function handleItemDetail(sharedfileId) {
   });
 
   try {
+    const cookieHeader = getCookieHeader(await getDecryptedCookies());
     const response = await axios.post(steamApiUrl, data, {
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
@@ -240,37 +248,21 @@ async function handleItemDetail(sharedfileId) {
 
       // 获取头像 URL 和昵称
       let avatarUrl = null;
-      let avatarFrameUrl = null;
       let creatorName = null;
 
       try {
         const profileResponse = await axios.get(creatorProfileUrl, {
           headers: {
-            'Cookie': `sessionid=${process.env.STEAM_SESSIONID}; steamLoginSecure=${process.env.STEAM_LOGIN_SECURE}`,
+            'Cookie': cookieHeader,
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
           },
           httpsAgent: new https.Agent({ rejectUnauthorized: false }), // 禁用 SSL 验证
         });
 
         const profileHtml = profileResponse.data;
-        const { document: profileDocument } = parseHTML(profileHtml);
-
-        // 提取昵称
-        const nicknameSpan = profileDocument.querySelector('span.actual_persona_name');
-        creatorName = nicknameSpan ? nicknameSpan.textContent.trim() : null;
-
-        // 提取头像 URL
-        const avatarDiv = profileDocument.querySelector('div.playerAvatarAutoSizeInner');
-        if (avatarDiv) {
-          const imgTags = avatarDiv.querySelectorAll('img');
-          if (imgTags.length === 1) {
-            avatarUrl = imgTags[0].src; // 头像 URL
-            avatarFrameUrl = null; // 没有头像框
-          } else if (imgTags.length >= 2) {
-            avatarUrl = imgTags[1].src; // 头像 URL（第二个 img 标签）
-            avatarFrameUrl = imgTags[0].src; // 头像框 URL（第一个 img 标签）
-          }
-        }
+        const profile = parseSteamProfile(profileHtml);
+        creatorName = profile.creatorName;
+        avatarUrl = profile.avatarUrl;
       } catch (error) {
         console.error('Error fetching profile page:', error);
       }
@@ -288,7 +280,6 @@ async function handleItemDetail(sharedfileId) {
         currentSubscribers: currentSubscribers,
         currentFavorites: currentFavorites,
         creatorAvatarUrl: avatarUrl,
-        creatorAvatarFrameUrl: avatarFrameUrl, // 新增头像框 URL
         creatorName: creatorName,
         creatorProfileUrl: creatorProfileUrl,
       };
@@ -319,6 +310,9 @@ function formatFileSize(bytes) {
 // 解析物品列表
 function parseItems(html) {
   const { document } = parseHTML(html);
+  const ssrItems = parseSsrItems(document);
+  if (ssrItems) return ssrItems;
+
   const items = [];
 
   // 解析物品列表
@@ -406,3 +400,5 @@ function parseItems(html) {
 app.use((req, res) => {
   res.status(404).render('404', { title: '404 - Page Not Found' });
 });
+
+module.exports = app;
