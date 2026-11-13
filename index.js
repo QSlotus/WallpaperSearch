@@ -252,6 +252,22 @@ async function handleSearch(params, cookies = {}) {
     };
   }
 
+  // Wallpaper Engine 2.8.42 起永久移除 Application 类型（工坊侧已清空），
+  // 老链接或手工构造的参数会拿到 0 条，这里直接说明原因而不是白跑一次上游请求
+  const asksForApplication =
+    params.requiredType.toLowerCase() === 'application' ||
+    params.requiredTags.toLowerCase() === 'application';
+
+  if (asksForApplication) {
+    return {
+      items: [],
+      maxPage: 1,
+      mature: matureRequest,
+      error:
+        'Application wallpapers were permanently removed from the Workshop by Wallpaper Engine 2.8.42 and can no longer be searched.',
+    };
+  }
+
   const cacheKey = JSON.stringify([
     params.searchText,
     params.requiredTags,
