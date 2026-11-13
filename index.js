@@ -1,143 +1,172 @@
 require('dotenv').config({ path: '.env' });
 require('dotenv').config({ path: '.env.local', override: true });
+
 const express = require('express');
-const expressLayouts = require('express-ejs-layouts'); // 引入 express-ejs-layouts
-const cookieParser = require('cookie-parser'); // 引入 cookie-parser
-const bodyParser = require('body-parser'); // 引入 body-parser
+const expressLayouts = require('express-ejs-layouts');
+const cookieParser = require('cookie-parser');
+const bodyParser = require('body-parser');
 const axios = require('axios');
 const { parseHTML } = require('linkedom');
 const path = require('path');
 const https = require('https');
+
+const { formatDescription } = require('./lib/bbcode');
+const { MemoryCache } = require('./lib/memoryCache');
 const { getCookieHeader, getDecryptedCookies } = require('./lib/cookieManager');
 const { parseSsrItems } = require('./lib/steamSsrParser');
 const { parseSteamProfile } = require('./lib/steamProfileParser');
 
+const WORKSHOP_APP_ID = '431960';
+const DEFAULT_SECTION = 'readytouseitems';
+const DEFAULT_SORT = 'textsearch';
+const DEFAULT_TREND_DAYS = '7';
+const STEAM_USER_AGENT =
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36';
+
+function readNumberEnv(name, fallback) {
+  const value = Number(process.env[name]);
+  return Number.isFinite(value) && value > 0 ? value : fallback;
+}
+
+const UPSTREAM_TIMEOUT_MS = readNumberEnv('UPSTREAM_TIMEOUT_MS', 15_000);
+const SEARCH_CACHE_TTL_MS = readNumberEnv('SEARCH_CACHE_TTL_MS', 5 * 60 * 1000);
+const ITEM_CACHE_TTL_MS = readNumberEnv('ITEM_CACHE_TTL_MS', 10 * 60 * 1000);
+const DISPLAY_TZ_OFFSET_HOURS = (() => {
+  const raw = Number(process.env.DISPLAY_TZ_OFFSET_HOURS);
+  return Number.isFinite(raw) ? raw : 8;
+})();
+
+const searchCache = new MemoryCache({ ttlMs: SEARCH_CACHE_TTL_MS, maxEntries: 300 });
+const itemCache = new MemoryCache({ ttlMs: ITEM_CACHE_TTL_MS, maxEntries: 300 });
+
+// 默认严格校验证书；仅在本机被 hosts 劫持时用 ALLOW_INSECURE_TLS=1 临时放开
+const insecureHttpsAgent =
+  process.env.ALLOW_INSECURE_TLS === '1'
+    ? new https.Agent({ rejectUnauthorized: false })
+    : undefined;
+
+function requestOptions(extra = {}) {
+  return insecureHttpsAgent ? { ...extra, httpsAgent: insecureHttpsAgent } : extra;
+}
+
+// 只保留状态码/错误码/消息，避免把带 Cookie 的 axios config 打进日志
+function describeError(error) {
+  const status = error?.response?.status;
+  const code = error?.code;
+  const message = error?.message || String(error);
+  return [status ? `status=${status}` : '', code ? `code=${code}` : '', message]
+    .filter(Boolean)
+    .join(' ');
+}
+
+function logUpstreamFailure(label, error) {
+  console.error(`[Upstream] ${label} failed: ${describeError(error)}`);
+}
+
+function logParseFailure(label, html) {
+  const length = typeof html === 'string' ? html.length : 0;
+  const hasSsrData = typeof html === 'string' && html.includes('valve-ssr-data');
+  const hasLegacySsr = typeof html === 'string' && html.includes('window.SSR');
+  console.error(
+    `[Parser] ${label} could not be parsed (bytes=${length}, valveSsrData=${hasSsrData}, legacySsr=${hasLegacySsr})`
+  );
+}
+
 const app = express();
 const port = process.env.PORT || 3000;
-app.use(cookieParser()); // 使用 cookie-parser 中间件
 
-// 配置 body-parser 中间件
-app.use(bodyParser.urlencoded({ extended: true })); // 解析 application/x-www-form-urlencoded
-app.use(bodyParser.json()); // 解析 application/json
+app.use(cookieParser());
+app.use(bodyParser.urlencoded({ extended: true }));
+app.use(bodyParser.json());
 
-// 设置模板引擎
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 
-// 使用 express-ejs-layouts
 app.use(expressLayouts);
-app.set('layout', 'layout'); // 设置默认布局文件为 views/layout.ejs
+app.set('layout', 'layout');
 
-// 静态文件服务
 app.use(express.static(path.join(__dirname, 'public')));
 
-// 首页路由
 app.get('/', (req, res) => {
+  res.set('Cache-Control', 'public, max-age=600');
   res.render('home', { title: 'Wallpaper Search' });
 });
 
-
-
-// 搜索路由
 app.get('/search', async (req, res) => {
-  const { searchtext, requiredtags, requiredtype, section, p, browsesort } = req.query;
-  const { items, maxPage, error } = await handleSearch(searchtext, requiredtags, requiredtype, section, p, browsesort, req);
+  const params = normalizeSearchParams(req.query);
+  const result = await handleSearch(params, req.cookies);
 
-  if (error) {
-    return res.render('search-results', {
-      title: 'Search Results - Wallpaper Search',
-      items: [],
-      searchtext,
-      requiredtags,
-      requiredtype,
-      section,
-      page: p || 1,
-      maxPage,
-      browsesort,
-      error,
-    });
+  // Mature 结果绝不能被公共缓存，否则会绕过邀请码把内容下发出去
+  if (result.error || result.mature) {
+    res.set('Cache-Control', 'private, no-store');
+  } else {
+    res.set('Cache-Control', 'public, max-age=300, stale-while-revalidate=600');
   }
 
   res.render('search-results', {
     title: 'Search Results - Wallpaper Search',
-    items,
-    searchtext,
-    requiredtags,
-    requiredtype,
-    section,
-    page: p || 1,
-    maxPage,
-    browsesort,
+    items: result.items,
+    searchtext: params.searchText,
+    requiredtags: params.requiredTags,
+    requiredtype: params.requiredType,
+    section: params.section,
+    page: params.page,
+    maxPage: result.maxPage,
+    browsesort: toSortValue(params),
+    error: result.error,
+    errorAction: result.errorAction,
   });
 });
 
-function formatDescription(description) {
-  // 替换 [h1]...[/h1] 为 <div class="bb_h1">...</div>
-  description = description.replace(/\[h1\](.*?)\[\/h1\]/g, '<div class="bb_h1">$1</div>');
-  // 替换 [h2]...[/h2] 为 <div class="bb_h2">...</div>
-  description = description.replace(/\[h2\](.*?)\[\/h2\]/g, '<div class="bb_h2">$1</div>');
-  // 替换 [h3]...[/h3] 为 <div class="bb_h3">...</div>
-  description = description.replace(/\[h3\](.*?)\[\/h3\]/g, '<div class="bb_h3">$1</div>');
-  // 替换 [b]...[/b] 为 <b>...</b>
-  description = description.replace(/\[b\](.*?)\[\/b\]/g, '<b>$1</b>');
-  // 替换 [u]...[/u] 为 <u>...</u>
-  description = description.replace(/\[u\](.*?)\[\/u\]/g, '<u>$1</u>');
-  // 替换 [i]...[/i] 为 <i>...</i>
-  description = description.replace(/\[i\](.*?)\[\/i\]/g, '<i>$1</i>');
-  // 替换换行符为 <br>
-  description = description.replace(/\n/g, '<br>');
-  // 替换 [url=...]...[/url] 为 <a href="...">...</a>
-  description = description.replace(/\[url=(.*?)\](.*?)\[\/url\]/g, function(match, url, text) {
-    // 如果 URL 没有 http:// 或 https:// 前缀，则添加 http://
-    if (!/^https?:\/\//i.test(url)) {
-      url = 'http://' + url;
-    }
-    return `<a href="${url}">${text}</a>`;
-  });
-  // 替换 [img]...[/img] 为 <img src="...">
-  description = description.replace(/\[img\](.*?)\[\/img\]/g, '<img src="$1">');
-  // 清理 HTML 内容
-  return description;
-}
-
-
-// 物品详情路由
 app.get('/item/:id', async (req, res) => {
-  const item = await handleItemDetail(req.params.id);
-  if (item) {
-    // 格式化 description
-    item.description = formatDescription(item.description);
-    res.render('item-detail', { title: item.title + ' - Wallpaper Search', item });
-  } else {
-    res.status(404).render('404', { title: '404 - Page Not Found' }); // 跳转到404页面
+  const sharedfileId = String(req.params.id || '');
+  if (!/^\d{1,20}$/.test(sharedfileId)) {
+    return res.status(404).render('404', { title: '404 - Page Not Found' });
   }
+
+  let item = itemCache.get(sharedfileId);
+  if (!item) {
+    item = await handleItemDetail(sharedfileId);
+    if (item) itemCache.set(sharedfileId, item);
+  }
+
+  if (!item) {
+    return res.status(404).render('404', { title: '404 - Page Not Found' });
+  }
+
+  res.set('Cache-Control', 'public, max-age=600, stale-while-revalidate=1800');
+  res.render('item-detail', {
+    title: `${item.title} - Wallpaper Search`,
+    item: { ...item, description: formatDescription(item.description) },
+  });
 });
 
-
-// 填写邀请码页面
 app.get('/invite-code', (req, res) => {
-  const userCode = req.cookies.code; // 获取用户提交的邀请码
-  const correctInviteCode = process.env.INVITE_CODE; // 从环境变量中读取正确的邀请码
+  const userCode = req.cookies.code;
+  const correctInviteCode = process.env.INVITE_CODE;
+  res.set('Cache-Control', 'private, no-store');
   res.render('invite-code', { title: 'Invite Code', code: userCode, correctInviteCode });
 });
 
-// 提交邀请码
 app.post('/submit-invite-code', (req, res) => {
-  const inviteCode = req.body.inviteCode; // 获取用户提交的邀请码
-  const correctInviteCode = process.env.INVITE_CODE; // 从环境变量中读取正确的邀请码
+  const inviteCode = req.body.inviteCode;
+  const correctInviteCode = process.env.INVITE_CODE;
 
   if (inviteCode === correctInviteCode) {
-    // 如果邀请码正确，将其存储到 Cookie 中
-    res.cookie('code', inviteCode, { maxAge: 30 * 24 * 60 * 60 * 1000 }); // 设置 Cookie 有效期为 30 天
-    res.redirect('/'); // 重定向到首页
+    res.cookie('code', inviteCode, { maxAge: 30 * 24 * 60 * 60 * 1000 });
+    res.redirect('/');
   } else {
-    // 如果邀请码错误，重新渲染 invite-code 页面并传递错误信息
+    res.set('Cache-Control', 'private, no-store');
     res.render('invite-code', {
       title: 'Invite Code',
       error: 'The invite code is incorrect. Please try again.',
       correctInviteCode,
     });
   }
+});
+
+app.use((req, res) => {
+  res.status(404).render('404', { title: '404 - Page Not Found' });
 });
 
 // 本地直接运行时启动监听；Serverless 平台只导出 Express app。
@@ -147,58 +176,197 @@ if (require.main === module) {
   });
 }
 
-// 搜索处理函数
-async function handleSearch(searchText, requiredTags, requiredType, section, page, browsesort, req) {
+// ---------------------------------------------------------------------------
+// 搜索参数
+// ---------------------------------------------------------------------------
 
-  // 检查是否尝试搜索 Mature 内容
-  if (requiredTags === 'Mature' && req.cookies.code !== process.env.INVITE_CODE) {
-    return { items: [], maxPage: 1, error: 'You have not entered the invite code yet.' };
+function normalizeSearchParams(query = {}) {
+  const rawPage = Number.parseInt(query.p, 10);
+  const page = Number.isFinite(rawPage) && rawPage > 0 ? rawPage : 1;
+
+  // 表单里 browsesort 的值形如 "trend&days=7"，这里拆回 sort + days 两段
+  let browseSort = typeof query.browsesort === 'string' ? query.browsesort.trim() : '';
+  let trendDays = typeof query.days === 'string' ? query.days.trim() : '';
+  const trendMatch = browseSort.match(/^trend(?:\s*&\s*days=(-?\d+))?$/);
+
+  if (trendMatch) {
+    browseSort = 'trend';
+    if (!trendDays && trendMatch[1]) trendDays = trendMatch[1];
+    if (!trendDays) trendDays = DEFAULT_TREND_DAYS;
+  } else if (!browseSort) {
+    browseSort = DEFAULT_SORT;
   }
 
+  return {
+    searchText: typeof query.searchtext === 'string' ? query.searchtext.trim() : '',
+    requiredTags:
+      typeof query.requiredtags === 'string' && query.requiredtags ? query.requiredtags : 'Everyone',
+    requiredType: typeof query.requiredtype === 'string' ? query.requiredtype : '',
+    section: typeof query.section === 'string' && query.section ? query.section : DEFAULT_SECTION,
+    page,
+    browseSort,
+    trendDays,
+  };
+}
 
-  let steamUrl = `https://steamcommunity.com/workshop/browse/?appid=431960&searchtext=${encodeURIComponent(searchText)}&section=${section}&p=${page}&browsesort=${browsesort}`;
+// 回填到表单/分页链接的 sort 值，保持与 option 的 value 一致
+function toSortValue(params) {
+  return params.browseSort === 'trend' ? `trend&days=${params.trendDays}` : params.browseSort;
+}
 
-  if (requiredTags) {
-    steamUrl += `&requiredtags%5B%5D=${requiredTags}`;
+function buildSteamBrowseUrl(params) {
+  const url = new URL('https://steamcommunity.com/workshop/browse/');
+  url.searchParams.set('appid', WORKSHOP_APP_ID);
+  url.searchParams.set('searchtext', params.searchText);
+  url.searchParams.set('section', params.section);
+  url.searchParams.set('p', String(params.page));
+  url.searchParams.set('browsesort', params.browseSort);
+
+  if (params.browseSort === 'trend') {
+    url.searchParams.set('days', String(params.trendDays));
+  }
+  if (params.requiredTags) {
+    url.searchParams.append('requiredtags[]', params.requiredTags);
+  }
+  if (params.requiredType) {
+    url.searchParams.append('requiredtags[]', params.requiredType);
+  }
+  return url.toString();
+}
+
+// ---------------------------------------------------------------------------
+// 搜索
+// ---------------------------------------------------------------------------
+
+async function handleSearch(params, cookies = {}) {
+  const matureRequest = params.requiredTags === 'Mature';
+  const inviteCode = process.env.INVITE_CODE;
+
+  if (matureRequest && !(inviteCode && cookies.code === inviteCode)) {
+    return {
+      items: [],
+      maxPage: 1,
+      mature: true,
+      error: 'Mature search is locked.',
+      errorAction: 'invite',
+    };
   }
 
-  if (requiredType) {
-    steamUrl += `&requiredtags%5B%5D=${requiredType}`;
-  }
+  const cacheKey = JSON.stringify([
+    params.searchText,
+    params.requiredTags,
+    params.requiredType,
+    params.section,
+    params.page,
+    params.browseSort,
+    params.trendDays,
+    matureRequest,
+  ]);
 
+  const cached = searchCache.get(cacheKey);
+  if (cached) return { ...cached, mature: matureRequest };
+
+  const steamUrl = buildSteamBrowseUrl(params);
+
+  let html;
   try {
     const cookieHeader = getCookieHeader(await getDecryptedCookies());
-    const response = await axios.get(steamUrl, {
-      headers: {
-        'Cookie': cookieHeader,
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-      },
-      httpsAgent: new https.Agent({ rejectUnauthorized: false }), // 禁用 SSL 验证
-    });
-
-    const html = response.data;
-    const { items, maxPage } = parseItems(html);
-    return { items, maxPage };
+    const response = await axios.get(
+      steamUrl,
+      requestOptions({
+        headers: {
+          Cookie: cookieHeader,
+          'User-Agent': STEAM_USER_AGENT,
+          'Accept-Language': 'en-US,en;q=0.9',
+        },
+        timeout: UPSTREAM_TIMEOUT_MS,
+      })
+    );
+    html = response.data;
   } catch (error) {
-    console.error('Error fetching data from Steam:', error);
-    return { items: [], maxPage: 1 };
+    logUpstreamFailure('workshop search', error);
+    return {
+      items: [],
+      maxPage: 1,
+      mature: matureRequest,
+      error: `Steam is not responding right now (${describeError(error)}). Please try again later.`,
+    };
   }
+
+  const parsed = parseItems(html);
+  if (!parsed) {
+    logParseFailure('workshop search', html);
+    return {
+      items: [],
+      maxPage: 1,
+      mature: matureRequest,
+      error: 'Steam returned a page this app could not read. The upstream layout may have changed.',
+    };
+  }
+
+  const result = { items: parsed.items, maxPage: parsed.maxPage };
+  if (result.items.length > 0) searchCache.set(cacheKey, result);
+  return { ...result, mature: matureRequest };
 }
 
-// 自定义时间格式化函数
-function formatDateTime(timestamp) {
-  const date = new Date(timestamp * 1000); // 将秒转换为毫秒
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0'); // 月份从0开始，需要加1
-  const day = String(date.getDate()).padStart(2, '0');
-  const hours = String(date.getHours()).padStart(2, '0');
-  const minutes = String(date.getMinutes()).padStart(2, '0');
-  const seconds = String(date.getSeconds()).padStart(2, '0');
+// 解析失败返回 null（调用方据此报错），不再把异常吞成“空结果”
+function parseItems(html) {
+  if (typeof html !== 'string' || !html) return null;
 
-  return `${year}/${month}/${day} ${hours}:${minutes}:${seconds}`;
+  const { document } = parseHTML(html);
+
+  const ssrItems = parseSsrItems(document);
+  if (ssrItems) return ssrItems;
+
+  // 旧版 DOM 兜底：Steam 2025 改版后已不再输出这些 class，保留仅作兼容
+  const items = [];
+  document.querySelectorAll('.workshopItem').forEach(item => {
+    const sharedfileId = item.querySelector('.ugc')?.dataset.publishedfileid || '';
+    if (!sharedfileId) return;
+    items.push({
+      title: item.querySelector('.workshopItemTitle')?.textContent.trim() || 'Unknown Title',
+      previewImage: item.querySelector('.workshopItemPreviewImage')?.src || '',
+      sharedfileId,
+      authorName:
+        item.querySelector('.workshop_author_link')?.textContent.trim() || 'Unknown Author',
+    });
+  });
+
+  if (items.length === 0) return null;
+  return { items, maxPage: parseLegacyMaxPage(document) };
 }
 
-// 物品详情处理函数
+function parseLegacyMaxPage(document) {
+  const pagingControls = document.querySelector('.workshopBrowsePagingControls');
+  if (!pagingControls || pagingControls.innerHTML.trim() === '') return 1;
+
+  const nextPageBtn = Array.from(pagingControls.querySelectorAll('.pagebtn')).find(
+    btn => btn.textContent.trim() === '>'
+  );
+
+  if (nextPageBtn && !nextPageBtn.classList.contains('disabled')) {
+    const prevLink = nextPageBtn.previousElementSibling;
+    if (prevLink && prevLink.classList.contains('pagelink')) {
+      const parsed = Number.parseInt(prevLink.textContent.trim().replace(/,/g, ''), 10);
+      if (Number.isFinite(parsed) && parsed > 0) return parsed;
+    }
+  }
+
+  const lastNumberNode = Array.from(pagingControls.childNodes).find(
+    node => node.nodeType === 3 && /\d+/.test(node.textContent.trim())
+  );
+  if (lastNumberNode) {
+    const parsed = Number.parseInt(lastNumberNode.textContent.trim().replace(/,/g, ''), 10);
+    if (Number.isFinite(parsed) && parsed > 0) return parsed;
+  }
+
+  return 1;
+}
+
+// ---------------------------------------------------------------------------
+// 详情
+// ---------------------------------------------------------------------------
+
 async function handleItemDetail(sharedfileId) {
   const steamApiUrl = 'https://api.steampowered.com/ISteamRemoteStorage/GetPublishedFileDetails/v1/';
   const data = new URLSearchParams({
@@ -206,199 +374,110 @@ async function handleItemDetail(sharedfileId) {
     'publishedfileids[0]': sharedfileId,
   });
 
+  let cookieHeader = '';
   try {
-    const cookieHeader = getCookieHeader(await getDecryptedCookies());
-    const response = await axios.post(steamApiUrl, data, {
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      httpsAgent: new https.Agent({ rejectUnauthorized: false }), // 禁用 SSL 验证
-    });
-
-    const itemDetails = response.data.response?.publishedfiledetails?.[0];
-
-    // 检查 result 是否为 9
-    if (itemDetails && itemDetails.result === 9) {
-      return null; // 返回 null，触发 404 页面
-    }
-
-    if (itemDetails) {
-      // 从 API 返回的数据中提取所需信息
-      const creatorId = itemDetails.creator;
-      const creatorProfileUrl = `https://steamcommunity.com/profiles/${creatorId}`;
-
-      // 提取 Type 和 Age Rating
-      let typeValue = 'Unknown';
-      let ageRatingValue = 'Unknown';
-
-      // 遍历 tags 数组，提取 type 和 age rating
-      itemDetails.tags.forEach(tag => {
-        const tagName = tag.tag.toLowerCase();
-        if (['scene', 'video', 'application', 'web'].includes(tagName)) {
-          typeValue = tag.tag; // 提取 type
-        }
-        if (['everyone', 'questionable', 'mature'].includes(tagName)) {
-          ageRatingValue = tag.tag; // 提取 age rating
-        }
-      });
-
-      // 提取统计信息
-      const currentSubscribers = itemDetails.subscriptions || 'N/A';
-      const currentFavorites = itemDetails.favorited || 'N/A';
-
-      // 获取头像 URL 和昵称
-      let avatarUrl = null;
-      let creatorName = null;
-
-      try {
-        const profileResponse = await axios.get(creatorProfileUrl, {
-          headers: {
-            'Cookie': cookieHeader,
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-          },
-          httpsAgent: new https.Agent({ rejectUnauthorized: false }), // 禁用 SSL 验证
-        });
-
-        const profileHtml = profileResponse.data;
-        const profile = parseSteamProfile(profileHtml);
-        creatorName = profile.creatorName;
-        avatarUrl = profile.avatarUrl;
-      } catch (error) {
-        console.error('Error fetching profile page:', error);
-      }
-
-      return {
-        id: itemDetails.publishedfileid,
-        title: itemDetails.title || 'Unknown Title',
-        description: itemDetails.description || 'No description available',
-        previewImage: itemDetails.preview_url || '',
-        fileSize: formatFileSize(itemDetails.file_size || 0),
-        timeCreated: formatDateTime(itemDetails.time_created), // 使用自定义格式化函数
-        timeUpdated: formatDateTime(itemDetails.time_updated), // 使用自定义格式化函数
-        type: typeValue,
-        ageRating: ageRatingValue,
-        currentSubscribers: currentSubscribers,
-        currentFavorites: currentFavorites,
-        creatorAvatarUrl: avatarUrl,
-        creatorName: creatorName,
-        creatorProfileUrl: creatorProfileUrl,
-      };
-    }
+    cookieHeader = getCookieHeader(await getDecryptedCookies());
   } catch (error) {
-    console.error('Error fetching item details:', error);
+    logUpstreamFailure('decrypt workshop cookies', error);
   }
 
-  return null; // 如果出现错误或无法解析物品，返回 null
+  let itemDetails;
+  try {
+    const response = await axios.post(
+      steamApiUrl,
+      data,
+      requestOptions({
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        timeout: UPSTREAM_TIMEOUT_MS,
+      })
+    );
+    itemDetails = response.data?.response?.publishedfiledetails?.[0];
+  } catch (error) {
+    logUpstreamFailure('workshop item details', error);
+    return null;
+  }
+
+  // result === 9 (k_EResultFileNotFound)：条目不存在或已删除
+  if (!itemDetails || itemDetails.result === 9) return null;
+
+  const creatorId = itemDetails.creator;
+  if (!creatorId) return null;
+
+  const creatorProfileUrl = `https://steamcommunity.com/profiles/${creatorId}`;
+
+  let typeValue = 'Unknown';
+  let ageRatingValue = 'Unknown';
+
+  for (const tag of Array.isArray(itemDetails.tags) ? itemDetails.tags : []) {
+    const tagName = String(tag?.tag || '').toLowerCase();
+    if (['scene', 'video', 'application', 'web'].includes(tagName)) typeValue = tag.tag;
+    if (['everyone', 'questionable', 'mature'].includes(tagName)) ageRatingValue = tag.tag;
+  }
+
+  let avatarUrl = null;
+  let creatorName = null;
+
+  try {
+    const profileResponse = await axios.get(
+      creatorProfileUrl,
+      requestOptions({
+        headers: { Cookie: cookieHeader, 'User-Agent': STEAM_USER_AGENT },
+        timeout: UPSTREAM_TIMEOUT_MS,
+      })
+    );
+    const profile = parseSteamProfile(profileResponse.data);
+    creatorName = profile.creatorName;
+    avatarUrl = profile.avatarUrl;
+  } catch (error) {
+    // 作者主页抓不到不影响主信息展示
+    logUpstreamFailure('creator profile', error);
+  }
+
+  return {
+    id: itemDetails.publishedfileid,
+    title: itemDetails.title || 'Unknown Title',
+    description: itemDetails.description || 'No description available',
+    previewImage: itemDetails.preview_url || '',
+    fileSize: formatFileSize(itemDetails.file_size || 0),
+    timeCreated: formatDateTime(itemDetails.time_created),
+    timeUpdated: formatDateTime(itemDetails.time_updated),
+    type: typeValue,
+    ageRating: ageRatingValue,
+    currentSubscribers: itemDetails.subscriptions || 'N/A',
+    currentFavorites: itemDetails.favorited || 'N/A',
+    creatorAvatarUrl: avatarUrl,
+    creatorName,
+    creatorProfileUrl,
+  };
 }
 
-// 文件大小格式化函数
 function formatFileSize(bytes) {
-  if (bytes === 0) return '0 Bytes';
+  const value = Number(bytes);
+  if (!Number.isFinite(value) || value <= 0) return '0 Bytes';
 
   const units = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
   const k = 1024;
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  const index = Math.min(Math.floor(Math.log(value) / Math.log(k)), units.length - 1);
+  const size = value / Math.pow(k, index);
+  const decimals = size < 10 ? 3 : 2;
 
-  // 动态调整小数位数
-  let size = bytes / Math.pow(k, i);
-  let decimals = size < 10 ? 3 : 2; // 小于 10 时保留 3 位小数，否则保留 2 位
-
-  return `${size.toFixed(decimals)} ${units[i]}`;
+  return `${size.toFixed(decimals)} ${units[index]}`;
 }
 
+// 固定按 UTC+8 展示，不依赖服务器时区（Vercel 上是 UTC）
+function formatDateTime(timestamp) {
+  const seconds = Number(timestamp);
+  if (!Number.isFinite(seconds) || seconds <= 0) return 'Unknown';
 
-// 解析物品列表
-function parseItems(html) {
-  const { document } = parseHTML(html);
-  const ssrItems = parseSsrItems(document);
-  if (ssrItems) return ssrItems;
+  const shifted = new Date(seconds * 1000 + DISPLAY_TZ_OFFSET_HOURS * 3600 * 1000);
+  if (Number.isNaN(shifted.getTime())) return 'Unknown';
 
-  const items = [];
+  const pad = value => String(value).padStart(2, '0');
+  const date = `${shifted.getUTCFullYear()}/${pad(shifted.getUTCMonth() + 1)}/${pad(shifted.getUTCDate())}`;
+  const time = `${pad(shifted.getUTCHours())}:${pad(shifted.getUTCMinutes())}:${pad(shifted.getUTCSeconds())}`;
+  const zone = `UTC${DISPLAY_TZ_OFFSET_HOURS >= 0 ? '+' : ''}${DISPLAY_TZ_OFFSET_HOURS}`;
 
-  // 解析物品列表
-  document.querySelectorAll('.workshopItem').forEach(item => {
-    const title = item.querySelector('.workshopItemTitle')?.textContent.trim() || 'Unknown Title';
-    const previewImage = item.querySelector('.workshopItemPreviewImage')?.src || '';
-    const sharedfileId = item.querySelector('.ugc')?.dataset.publishedfileid || '';
-    const authorName = item.querySelector('.workshop_author_link')?.textContent.trim() || 'Unknown Author';
-
-    items.push({ title, previewImage, sharedfileId, authorName });
-  });
-
-  // 解析分页控件
-  const pagingControls = document.querySelector('.workshopBrowsePagingControls');
-  let maxPage = 1;
-
-  if (pagingControls && pagingControls.innerHTML.trim() !== '') {
-    // console.log('Paging Controls HTML:', pagingControls.innerHTML); // 输出分页控件的原始 HTML
-
-    const pageBtns = pagingControls.querySelectorAll('.pagebtn');
-    let nextPageBtn = null;
-
-    // 找到内容为 ">" 的按钮（可能是 enabled 或 disabled）
-    pageBtns.forEach(btn => {
-      if (btn.textContent.trim() === '>') {
-        nextPageBtn = btn;
-      }
-    });
-
-    if (nextPageBtn) {
-      // console.log('Next Page Button:', nextPageBtn.outerHTML); // 输出 ">" 按钮的原始 HTML
-
-      // 如果 ">" 按钮被禁用，说明当前页是最后一页
-      if (nextPageBtn.classList.contains('disabled')) {
-        // console.log('Next Page Button is disabled. Current page is the last page.');
-
-        // 找到最后一个数字节点（可能是 <a> 标签或纯文本节点）
-        const lastNumberNode = Array.from(pagingControls.childNodes).find(node => {
-          return node.nodeType === 3 && /\d+/.test(node.textContent.trim()); // 3 表示文本节点
-        });
-
-        if (lastNumberNode) {
-          // console.log('Last Number Node:', lastNumberNode.textContent.trim()); // 输出最后一个数字节点的内容
-          maxPage = parseInt(lastNumberNode.textContent.trim().replace(/,/g, ''), 10);
-        } else {
-          // console.log('No last number node found.');
-        }
-      } else {
-        // console.log('Next Page Button is enabled. Current page is not the last page.');
-
-        // 如果 ">" 按钮未被禁用，说明当前页不是最后一页
-        // 找到 nextPageBtn 前面的 pagelink
-        const prevLink = nextPageBtn.previousElementSibling;
-        if (prevLink && prevLink.classList.contains('pagelink')) {
-          // console.log('Previous Link:', prevLink.outerHTML); // 输出 prevLink 的原始 HTML
-          maxPage = parseInt(prevLink.textContent.trim().replace(/,/g, ''), 10); // 去除逗号并转换为数字
-        } else {
-          // console.log('No previous link found.');
-        }
-      }
-    } else {
-      // console.log('No Next Page Button found.');
-
-      // 如果没有找到 ">" 按钮，可能是最后一页
-      const lastNumberNode = Array.from(pagingControls.childNodes).find(node => {
-        return node.nodeType === 3 && /\d+/.test(node.textContent.trim()); // 3 表示文本节点
-      });
-
-      if (lastNumberNode) {
-        // console.log('Last Number Node:', lastNumberNode.textContent.trim()); // 输出最后一个数字节点的内容
-        maxPage = parseInt(lastNumberNode.textContent.trim().replace(/,/g, ''), 10);
-      } else {
-        // console.log('No last number node found.');
-      }
-    }
-  } else {
-    // console.log('No paging controls found.');
-  }
-
-  // console.log('Parsed maxPage:', maxPage); // 输出解析后的 maxPage
-  return { items, maxPage };
+  return `${date} ${time} (${zone})`;
 }
-
-// 添加404页面路由
-app.use((req, res) => {
-  res.status(404).render('404', { title: '404 - Page Not Found' });
-});
 
 module.exports = app;

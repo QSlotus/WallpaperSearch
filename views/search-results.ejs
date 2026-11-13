@@ -10,12 +10,14 @@
   </div>
 </header>
 
-<% if (typeof error !== 'undefined') { %>
+<% if (typeof error !== 'undefined' && error) { %>
   <div class="notice notice-danger" role="alert">
     <i data-lucide="circle-alert" aria-hidden="true"></i>
     <div>
       <%= error %>
-      <a href="/invite-code">Enter an invite code</a>.
+      <% if (typeof errorAction !== 'undefined' && errorAction === 'invite') { %>
+        <a href="/invite-code">Enter an invite code</a>.
+      <% } %>
     </div>
   </div>
 <% } %>

@@ -4,3 +4,6 @@ node_modules/
 npm-debug.log*
 
 .vercel
+
+# 本地工作记录与记忆，不进仓库
+.workbuddy/
