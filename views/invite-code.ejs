@@ -17,7 +17,8 @@
   </div>
 <% } %>
 
-<% if (typeof code !== 'undefined' && code === correctInviteCode) { %>
+<% const nextPath = typeof next !== 'undefined' && next ? next : '/'; %>
+<% if (typeof unlocked !== 'undefined' && unlocked) { %>
   <div class="notice notice-success" role="status">
     <i data-lucide="badge-check" aria-hidden="true"></i>
     <span>Mature content search is unlocked on this browser.</span>
@@ -27,13 +28,17 @@
       <div class="empty-state-icon"><i data-lucide="shield-check" aria-hidden="true"></i></div>
       <h2>Access unlocked</h2>
       <p>You can now select Mature in the audience filter.</p>
-      <a class="button button-primary" href="/">Return home</a>
+      <a class="button button-primary" href="<%= nextPath %>">
+        <i data-lucide="arrow-right" aria-hidden="true"></i>
+        Continue
+      </a>
     </div>
   </section>
 <% } else { %>
   <section class="auth-content">
     <p>Enter your invite code to unlock the Mature option in Wallpaper Search.</p>
     <form class="invite-form" action="/submit-invite-code" method="post">
+      <input type="hidden" name="next" value="<%= nextPath %>">
       <label class="text-field" for="inviteCode">
         <span>Invite code</span>
         <input type="text" id="inviteCode" name="inviteCode" required autocomplete="off" autofocus>

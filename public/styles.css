@@ -818,6 +818,14 @@ svg {
   max-width: 340px;
 }
 
+.locked-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+  margin-top: 18px;
+}
+
 .empty-state-icon {
   display: grid;
   width: 58px;

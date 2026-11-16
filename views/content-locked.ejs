@@ -7,14 +7,18 @@
   </div>
 </header>
 
+<% const returnTo = typeof nextPath !== 'undefined' && nextPath ? nextPath : '/'; %>
 <section class="empty-state">
   <div class="empty-state-inner">
     <div class="empty-state-icon"><i data-lucide="lock" aria-hidden="true"></i></div>
     <h2>This item is locked</h2>
-    <p>Mature wallpapers require an invite code. Enter one to unlock them on this browser.</p>
-    <a class="button button-primary" href="/invite-code">
-      <i data-lucide="key-round" aria-hidden="true"></i>
-      Enter invite code
-    </a>
+    <p>Mature wallpapers require an invite code. Enter one to unlock them on this browser, then you will be brought back here.</p>
+    <div class="locked-actions">
+      <a class="button button-primary" href="/invite-code?next=<%= encodeURIComponent(returnTo) %>">
+        <i data-lucide="key-round" aria-hidden="true"></i>
+        Enter invite code
+      </a>
+      <a class="button button-secondary" href="/">Back to home</a>
+    </div>
   </div>
 </section>

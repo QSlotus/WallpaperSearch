@@ -18,6 +18,7 @@ const { parseSsrItems } = require('./lib/steamSsrParser');
 const { parseSteamProfile } = require('./lib/steamProfileParser');
 const { fetchPreviews } = require('./lib/steamPreviews');
 const { normalizeSearchParams, toSortValue } = require('./lib/searchParams');
+const { safeNextPath } = require('./lib/redirect');
 
 const WORKSHOP_APP_ID = '431960';
 const STEAM_USER_AGENT =
@@ -155,6 +156,8 @@ app.get('/item/:id', async (req, res) => {
     res.set('Cache-Control', 'private, no-store');
     return res.status(403).render('content-locked', {
       title: 'Mature content locked - Wallpaper Search',
+      // 解锁后回到当前条目，而不是被丢回首页
+      nextPath: req.originalUrl,
     });
   }
 
@@ -172,27 +175,32 @@ app.get('/item/:id', async (req, res) => {
 });
 
 app.get('/invite-code', (req, res) => {
-  const userCode = req.cookies.code;
-  const correctInviteCode = process.env.INVITE_CODE;
   res.set('Cache-Control', 'private, no-store');
-  res.render('invite-code', { title: 'Invite Code', code: userCode, correctInviteCode });
+  res.render('invite-code', {
+    title: 'Invite Code',
+    unlocked: hasMatureAccess(req.cookies),
+    next: safeNextPath(req.query.next, '/'),
+  });
 });
 
 app.post('/submit-invite-code', (req, res) => {
-  const inviteCode = req.body.inviteCode;
+  const inviteCode = typeof req.body.inviteCode === 'string' ? req.body.inviteCode.trim() : '';
   const correctInviteCode = process.env.INVITE_CODE;
+  const nextPath = safeNextPath(req.body.next, '/');
 
-  if (inviteCode === correctInviteCode) {
-    res.cookie('code', inviteCode, { maxAge: 30 * 24 * 60 * 60 * 1000 });
-    res.redirect('/');
-  } else {
-    res.set('Cache-Control', 'private, no-store');
-    res.render('invite-code', {
-      title: 'Invite Code',
-      error: 'The invite code is incorrect. Please try again.',
-      correctInviteCode,
-    });
+  if (correctInviteCode && safeEqual(inviteCode, correctInviteCode)) {
+    // 存规范化后的值，避免用户输入的大小写差异导致下次比对不一致
+    res.cookie('code', correctInviteCode, { maxAge: 30 * 24 * 60 * 60 * 1000 });
+    return res.redirect(nextPath);
   }
+
+  res.set('Cache-Control', 'private, no-store');
+  res.render('invite-code', {
+    title: 'Invite Code',
+    error: 'The invite code is incorrect. Please try again.',
+    unlocked: false,
+    next: nextPath,
+  });
 });
 
 app.use((req, res) => {
