@@ -10,8 +10,31 @@
   </div>
 </header>
 
+<% const galleryShots = Array.isArray(item.gallery) ? item.gallery : []; %>
+<% const thumbQuery = '?imw=240&imh=135&ima=fit&impolicy=Letterbox&imcolor=%23000000&letterbox=false'; %>
 <section class="detail-hero" aria-label="Wallpaper preview">
-  <img src="<%= item.previewImage %>" alt="<%= item.title %>">
+  <img id="detail-hero-image" src="<%= item.previewImage %>" alt="<%= item.title %>">
+
+  <% if (galleryShots.length > 1) { %>
+    <div class="detail-gallery" role="group" aria-label="Preview images">
+      <% galleryShots.forEach(function (shot, index) { %>
+        <button class="detail-gallery-item<%= index === 0 ? ' is-active' : '' %>" type="button"
+                data-gallery-src="<%= shot.url %>"
+                aria-pressed="<%= index === 0 ? 'true' : 'false' %>"
+                aria-label="Show preview image <%= index + 1 %> of <%= galleryShots.length %>">
+          <img src="<%= shot.url %><%= thumbQuery %>" alt="" loading="lazy">
+        </button>
+      <% }); %>
+    </div>
+  <% } %>
+
+  <% if (Array.isArray(item.previewVideos) && item.previewVideos.length > 0) { %>
+    <a class="detail-video-link" href="https://www.youtube.com/watch?v=<%= item.previewVideos[0].youtubeId %>"
+       target="_blank" rel="noopener noreferrer">
+      <i data-lucide="play" aria-hidden="true"></i>
+      <span>Watch preview video</span>
+    </a>
+  <% } %>
 </section>
 
 <section class="detail-section" aria-labelledby="creator-heading">
@@ -104,6 +127,22 @@
 </div>
 
 <script>
+  var heroImage = document.getElementById('detail-hero-image');
+  var galleryButtons = document.querySelectorAll('[data-gallery-src]');
+
+  Array.prototype.forEach.call(galleryButtons, function(button) {
+    button.addEventListener('click', function() {
+      var src = button.getAttribute('data-gallery-src');
+      if (!src || !heroImage) return;
+      heroImage.src = src;
+      Array.prototype.forEach.call(galleryButtons, function(other) {
+        var isActive = other === button;
+        other.classList.toggle('is-active', isActive);
+        other.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+      });
+    });
+  });
+
   document.getElementById('copy-button').addEventListener('click', function() {
     const commandText = document.getElementById('steamcmd-command').innerText;
     const copyButton = document.getElementById('copy-button');

@@ -15,6 +15,7 @@ const { MemoryCache } = require('./lib/memoryCache');
 const { getCookieHeader, getDecryptedCookies } = require('./lib/cookieManager');
 const { parseSsrItems } = require('./lib/steamSsrParser');
 const { parseSteamProfile } = require('./lib/steamProfileParser');
+const { fetchPreviews } = require('./lib/steamPreviews');
 
 const WORKSHOP_APP_ID = '431960';
 const DEFAULT_SECTION = 'readytouseitems';
@@ -430,30 +431,23 @@ async function handleItemDetail(sharedfileId) {
     if (['everyone', 'questionable', 'mature'].includes(tagName)) ageRatingValue = tag.tag;
   }
 
-  let avatarUrl = null;
-  let creatorName = null;
+  // 作者资料与预览大图互不依赖，并行抓取，任一失败都不影响主信息
+  const [profile, previews] = await Promise.all([
+    fetchCreatorProfile(creatorProfileUrl, cookieHeader),
+    fetchItemPreviews(sharedfileId),
+  ]);
 
-  try {
-    const profileResponse = await axios.get(
-      creatorProfileUrl,
-      requestOptions({
-        headers: { Cookie: cookieHeader, 'User-Agent': STEAM_USER_AGENT },
-        timeout: UPSTREAM_TIMEOUT_MS,
-      })
-    );
-    const profile = parseSteamProfile(profileResponse.data);
-    creatorName = profile.creatorName;
-    avatarUrl = profile.avatarUrl;
-  } catch (error) {
-    // 作者主页抓不到不影响主信息展示
-    logUpstreamFailure('creator profile', error);
-  }
+  const gallery = previews?.images ?? [];
+  const previewVideos = previews?.videos ?? [];
 
   return {
     id: itemDetails.publishedfileid,
     title: itemDetails.title || 'Unknown Title',
     description: itemDetails.description || 'No description available',
-    previewImage: itemDetails.preview_url || '',
+    // 优先用 previews 里的大图（常见 3840x2160）；拿不到才退回 192x192 的动态缩略图
+    previewImage: gallery[0]?.url || itemDetails.preview_url || '',
+    gallery,
+    previewVideos,
     fileSize: formatFileSize(itemDetails.file_size || 0),
     timeCreated: formatDateTime(itemDetails.time_created),
     timeUpdated: formatDateTime(itemDetails.time_updated),
@@ -461,10 +455,39 @@ async function handleItemDetail(sharedfileId) {
     ageRating: ageRatingValue,
     currentSubscribers: itemDetails.subscriptions || 'N/A',
     currentFavorites: itemDetails.favorited || 'N/A',
-    creatorAvatarUrl: avatarUrl,
-    creatorName,
+    creatorAvatarUrl: profile?.avatarUrl || null,
+    creatorName: profile?.creatorName || null,
     creatorProfileUrl,
   };
+}
+
+async function fetchCreatorProfile(profileUrl, cookieHeader) {
+  try {
+    const response = await axios.get(
+      profileUrl,
+      requestOptions({
+        headers: { Cookie: cookieHeader, 'User-Agent': STEAM_USER_AGENT },
+        timeout: UPSTREAM_TIMEOUT_MS,
+      })
+    );
+    return parseSteamProfile(response.data);
+  } catch (error) {
+    // 作者主页抓不到不影响主信息展示
+    logUpstreamFailure('creator profile', error);
+    return null;
+  }
+}
+
+async function fetchItemPreviews(sharedfileId) {
+  try {
+    return await fetchPreviews(sharedfileId, {
+      axiosConfig: requestOptions({ timeout: UPSTREAM_TIMEOUT_MS }),
+    });
+  } catch (error) {
+    // 没有 key 或上游失败时静默降级为缩略图
+    logUpstreamFailure('workshop previews', error);
+    return null;
+  }
 }
 
 function formatFileSize(bytes) {

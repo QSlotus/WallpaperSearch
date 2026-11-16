@@ -15,6 +15,7 @@ Wallpaper Engine Workshop 搜索工具。Steam Cookie 会从 GitHub 仓库拉取
 | `COOKIE_FILE_PATH` | 加密 Cookie 文件路径，默认 `cookie.enc.json` |
 | `INVITE_CODE` | Mature 内容邀请码，留空则 Mature 搜索完全关闭 |
 | `PORT` | HTTP 服务端口，默认 `3000` |
+| `STEAM_API_KEY` | Steam WebAPI key，用于取高清预览图，可选 |
 | `UPSTREAM_TIMEOUT_MS` | 上游请求超时，默认 `15000` |
 | `SEARCH_CACHE_TTL_MS` | 搜索结果进程内缓存，默认 `300000`（5 分钟） |
 | `ITEM_CACHE_TTL_MS` | 详情页进程内缓存，默认 `600000`（10 分钟） |
@@ -40,6 +41,21 @@ Wallpaper Engine Workshop 搜索工具。Steam Cookie 会从 GitHub 仓库拉取
 
 如果三种方式都拿不到数据，页面会显示明确的错误提示，并在日志里打印
 `[Parser] ... (bytes=..., valveSsrData=..., legacySsr=...)`，便于判断是上游改版还是网络故障。
+
+## 预览图
+
+详情页的主图**不是** `preview_url`。`ISteamRemoteStorage/GetPublishedFileDetails` 返回的
+`preview_url` 只是 192×192 的动态缩略图 GIF（Wallpaper Engine 拿它当列表缩略图），直接当大图用会糊。
+
+真正的预览大图来自 `IPublishedFileService/GetDetails` + `includeadditionalpreviews=true`，
+返回的 `previews` 数组里是作者上传的原图（实测多为 3840×2160 与 1920×1080），
+还可能包含 YouTube 视频预览（`preview_type: 1`）。
+
+- 配置了 `STEAM_API_KEY`：主图用最大那张，下方出现缩略图画廊，有视频预览时给出跳转链接
+- 没配置 key 或请求失败：静默降级回 192×192 缩略图，功能不受影响
+
+取原图时**不要**给 URL 加 `?imw=5000` 之类的参数——带参数会被重新压缩（实测 1.24 MB vs 无参数的 1.61 MB）。
+只有缩略图条才用 `?imw=240` 让 CDN 出小图，省流量。
 
 ## 缓存
 
