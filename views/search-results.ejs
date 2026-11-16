@@ -1,13 +1,19 @@
 <% const paginationBase = typeof listBase !== 'undefined' && listBase ? listBase : '/search'; %>
 <% const isAuthorView = typeof authorId !== 'undefined' && authorId; %>
+<%
+  const pageHeading = isAuthorView ? 'Creator items' : (searchtext ? 'Search' : 'Explore');
+  const pageSubtitle = isAuthorView
+    ? (searchtext ? 'Matching "' + searchtext + '" in this creator\'s items' : 'All wallpapers uploaded by this creator')
+    : (searchtext ? 'Results for "' + searchtext + '"' : 'Browse Workshop items');
+%>
 <header class="page-header">
   <div class="page-header-main">
     <a class="icon-button" href="/" aria-label="Back to home" title="Back to home">
       <i data-lucide="arrow-left" aria-hidden="true"></i>
     </a>
     <div>
-      <h1><%= isAuthorView ? 'Creator items' : 'Search' %></h1>
-      <p><%= isAuthorView ? 'All wallpapers uploaded by this creator' : (searchtext ? 'Results for "' + searchtext + '"' : 'Browse Workshop items') %></p>
+      <h1><%= pageHeading %></h1>
+      <p><%= pageSubtitle %></p>
     </div>
   </div>
 </header>

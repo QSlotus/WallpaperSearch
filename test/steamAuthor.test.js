@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict');
 const test = require('node:test');
 
-const { normalizeItem, sortItems, buildTagParams } = require('../lib/steamAuthor');
+const { normalizeItem, sortItems, buildTagParams, filterItems } = require('../lib/steamAuthor');
 
 // 真实 GetUserFiles 返回形状（截取关键字段）
 const RAW = {
@@ -56,6 +56,21 @@ test('builds indexed requiredtags params the API expects', () => {
   });
 
   assert.deepEqual(buildTagParams({}), {});
+});
+
+test('filters items by keyword locally', () => {
+  const items = [
+    { title: 'Sunset Cat [4K]', shortDescription: 'a cat at sunset' },
+    { title: 'Blue Sky [4K]', shortDescription: 'clouds' },
+    { title: 'Moon Cat', shortDescription: '' },
+  ];
+
+  assert.equal(filterItems(items, 'cat').length, 2);
+  assert.equal(filterItems(items, 'CAT').length, 2);
+  assert.equal(filterItems(items, 'sunset').length, 1);
+  assert.equal(filterItems(items, 'zzz').length, 0);
+  assert.equal(filterItems(items, '').length, 3);
+  assert.equal(filterItems(items, '   ').length, 3);
 });
 
 test('sorts by subscribers and by creation time', () => {

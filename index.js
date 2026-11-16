@@ -19,7 +19,7 @@ const { parseSteamProfile } = require('./lib/steamProfileParser');
 const { fetchPreviews } = require('./lib/steamPreviews');
 const { normalizeSearchParams, toSortValue } = require('./lib/searchParams');
 const { safeNextPath } = require('./lib/redirect');
-const { fetchAuthorFiles, sortItems: sortAuthorItems } = require('./lib/steamAuthor');
+const { fetchAuthorFiles, sortItems: sortAuthorItems, filterItems: filterAuthorItems } = require('./lib/steamAuthor');
 
 const WORKSHOP_APP_ID = '431960';
 const STEAM_USER_AGENT =
@@ -142,6 +142,10 @@ app.get('/search', async (req, res) => {
     browsesort: toSortValue(params),
     error: result.error,
     errorAction: result.errorAction,
+    // Explore 是纯浏览：没有搜索词时只留筛选，改动筛选即刷新
+    hideSearchInput: !params.searchText,
+    autoSubmit: true,
+    formAction: '/search',
   });
 });
 
@@ -160,7 +164,7 @@ app.get('/author/:steamId', async (req, res) => {
   const baseView = {
     title: 'Creator items - Wallpaper Search',
     authorId: steamId,
-    searchtext: '',
+    searchtext: searchParams.searchText,
     requiredtags: searchParams.requiredTags,
     requiredtype: searchParams.requiredType,
     section: searchParams.section,
@@ -168,6 +172,8 @@ app.get('/author/:steamId', async (req, res) => {
     listBase: `/author/${steamId}`,
     formAction: `/author/${steamId}`,
     sortOptions: AUTHOR_SORT_OPTIONS,
+    searchPlaceholder: 'Search creator items',
+    autoSubmit: true,
     page: 1,
     maxPage: 1,
     items: [],
@@ -209,7 +215,10 @@ app.get('/author/:steamId', async (req, res) => {
     authorCache.set(cacheKey, data);
   }
 
-  const sorted = sortAuthorItems(data.items, sortMode);
+  const sorted = sortAuthorItems(
+    filterAuthorItems(data.items, searchParams.searchText),
+    sortMode
+  );
   const maxPage = Math.max(1, Math.ceil(sorted.length / AUTHOR_PAGE_SIZE));
   const page = Math.min(Math.max(searchParams.page, 1), maxPage);
   const pageItems = sorted.slice((page - 1) * AUTHOR_PAGE_SIZE, page * AUTHOR_PAGE_SIZE);

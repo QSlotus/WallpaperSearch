@@ -16,20 +16,27 @@
   ];
   const sortChoices = typeof sortOptions !== 'undefined' ? sortOptions : defaultSortChoices;
   const formTarget = typeof formAction !== 'undefined' ? formAction : '/search';
+  const hideSearch = typeof hideSearchInput !== 'undefined' && hideSearchInput;
+  const auto = typeof autoSubmit !== 'undefined' && autoSubmit;
+  const placeholder = typeof searchPlaceholder !== 'undefined' ? searchPlaceholder : 'Search wallpapers';
 %>
 
-<form action="<%= formTarget %>" method="get" class="search-form-main">
+<form action="<%= formTarget %>" method="get" class="search-form-main"<% if (auto) { %> data-autosubmit="true"<% } %>>
+  <% if (!hideSearch) { %>
   <div class="search-query-row">
     <label class="search-query-field">
       <i data-lucide="search" aria-hidden="true"></i>
       <span class="sr-only">Search wallpapers</span>
-      <input type="search" name="searchtext" value="<%= currentSearchText %>" placeholder="Search wallpapers" autocomplete="off">
+      <input type="search" name="searchtext" value="<%= currentSearchText %>" placeholder="<%= placeholder %>" autocomplete="off">
     </label>
     <button type="submit" class="button button-primary search-submit">
       <i data-lucide="search" aria-hidden="true"></i>
       <span>Search</span>
     </button>
   </div>
+  <% } else { %>
+  <input type="hidden" name="searchtext" value="<%= currentSearchText %>">
+  <% } %>
 
   <div class="filter-grid">
     <label class="filter-control">

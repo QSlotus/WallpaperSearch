@@ -8,8 +8,11 @@
       matureOption.textContent = 'Mature (Requires Invite Code)';
     }
 
-    const searchForm = document.querySelector('main form[action="/search"]');
+    const searchForm = document.querySelector('main form.search-form-main');
     if (!searchForm) return;
+
+    // Explore 与创作者页：改动筛选立刻刷新结果，不需要再点按钮
+    const autoSubmit = searchForm.getAttribute('data-autosubmit') === 'true';
 
     const searchTextInput = searchForm.querySelector('input[name="searchtext"]');
     const requiredTagsSelect = searchForm.querySelector('select[name="requiredtags"]');
@@ -17,13 +20,17 @@
     const browseSortSelect = searchForm.querySelector('select[name="browsesort"]');
     const pageInput = searchForm.querySelector('input[name="p"]');
 
-    searchTextInput.addEventListener('input', function() {
-      pageInput.value = 1;
-    });
+    if (searchTextInput && pageInput) {
+      searchTextInput.addEventListener('input', function() {
+        pageInput.value = 1;
+      });
+    }
 
     [requiredTagsSelect, requiredTypeSelect, browseSortSelect].forEach(function(select) {
+      if (!select) return;
       select.addEventListener('change', function() {
-        pageInput.value = 1;
+        if (pageInput) pageInput.value = 1;
+        if (autoSubmit) searchForm.submit();
       });
     });
 
