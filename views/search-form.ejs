@@ -3,8 +3,22 @@
 <% const currentRequiredType = typeof requiredtype !== 'undefined' ? requiredtype : ''; %>
 <% const currentBrowseSort = typeof browsesort !== 'undefined' ? browsesort : 'textsearch'; %>
 <% const currentPage = typeof page !== 'undefined' ? page : 1; %>
+<%
+  const defaultSortChoices = [
+    ['textsearch', 'Relevance'],
+    ['totaluniquesubscribers', 'Most subscribed'],
+    ['mostrecent', 'Most recent'],
+    ['trend&days=1', 'Trending today'],
+    ['trend&days=7', 'Trending 7 days'],
+    ['trend&days=30', 'Trending 30 days'],
+    ['trend&days=365', 'Trending year'],
+    ['trend&days=-1', 'Trending all time'],
+  ];
+  const sortChoices = typeof sortOptions !== 'undefined' ? sortOptions : defaultSortChoices;
+  const formTarget = typeof formAction !== 'undefined' ? formAction : '/search';
+%>
 
-<form action="/search" method="get" class="search-form-main">
+<form action="<%= formTarget %>" method="get" class="search-form-main">
   <div class="search-query-row">
     <label class="search-query-field">
       <i data-lucide="search" aria-hidden="true"></i>
@@ -38,14 +52,9 @@
     <label class="filter-control filter-control-wide">
       <span>Sort by</span>
       <select name="browsesort">
-        <option value="textsearch" <%= currentBrowseSort === 'textsearch' ? 'selected' : '' %>>Relevance</option>
-        <option value="totaluniquesubscribers" <%= currentBrowseSort === 'totaluniquesubscribers' ? 'selected' : '' %>>Most subscribed</option>
-        <option value="mostrecent" <%= currentBrowseSort === 'mostrecent' ? 'selected' : '' %>>Most recent</option>
-        <option value="trend&days=1" <%= currentBrowseSort === 'trend&days=1' ? 'selected' : '' %>>Trending today</option>
-        <option value="trend&days=7" <%= currentBrowseSort === 'trend&days=7' ? 'selected' : '' %>>Trending 7 days</option>
-        <option value="trend&days=30" <%= currentBrowseSort === 'trend&days=30' ? 'selected' : '' %>>Trending 30 days</option>
-        <option value="trend&days=365" <%= currentBrowseSort === 'trend&days=365' ? 'selected' : '' %>>Trending year</option>
-        <option value="trend&days=-1" <%= currentBrowseSort === 'trend&days=-1' ? 'selected' : '' %>>Trending all time</option>
+        <% sortChoices.forEach(function (choice) { %>
+          <option value="<%= choice[0] %>" <%= currentBrowseSort === choice[0] ? 'selected' : '' %>><%= choice[1] %></option>
+        <% }); %>
       </select>
     </label>
   </div>

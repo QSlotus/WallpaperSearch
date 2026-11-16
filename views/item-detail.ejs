@@ -51,12 +51,20 @@
       <p class="creator-name"><%= item.creatorName || 'Unknown Creator' %></p>
       <p class="creator-label">Workshop uploader</p>
     </div>
-    <% if (item.creatorProfileUrl) { %>
-      <a class="button profile-link" href="<%= item.creatorProfileUrl %>" target="_blank" rel="noopener noreferrer">
-        <i data-lucide="external-link" aria-hidden="true"></i>
-        <span>Profile</span>
-      </a>
-    <% } %>
+    <div class="creator-actions">
+      <% if (item.creatorId) { %>
+        <a class="button profile-link" href="/author/<%= item.creatorId %>">
+          <i data-lucide="layout-grid" aria-hidden="true"></i>
+          <span>All items</span>
+        </a>
+      <% } %>
+      <% if (item.creatorProfileUrl) { %>
+        <a class="button profile-link" href="<%= item.creatorProfileUrl %>" target="_blank" rel="noopener noreferrer">
+          <i data-lucide="external-link" aria-hidden="true"></i>
+          <span>Profile</span>
+        </a>
+      <% } %>
+    </div>
   </div>
 </section>
 

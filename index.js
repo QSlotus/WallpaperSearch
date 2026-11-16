@@ -19,6 +19,7 @@ const { parseSteamProfile } = require('./lib/steamProfileParser');
 const { fetchPreviews } = require('./lib/steamPreviews');
 const { normalizeSearchParams, toSortValue } = require('./lib/searchParams');
 const { safeNextPath } = require('./lib/redirect');
+const { fetchAuthorFiles, sortItems: sortAuthorItems } = require('./lib/steamAuthor');
 
 const WORKSHOP_APP_ID = '431960';
 const STEAM_USER_AGENT =
@@ -39,6 +40,15 @@ const DISPLAY_TZ_OFFSET_HOURS = (() => {
 
 const searchCache = new MemoryCache({ ttlMs: SEARCH_CACHE_TTL_MS, maxEntries: 300 });
 const itemCache = new MemoryCache({ ttlMs: ITEM_CACHE_TTL_MS, maxEntries: 300 });
+const authorCache = new MemoryCache({ ttlMs: SEARCH_CACHE_TTL_MS, maxEntries: 200 });
+
+// 作者作品页只能用本地排序：GetUserFiles 的 sort_method 实测无效
+const AUTHOR_SORT_OPTIONS = [
+  ['default', 'Default order'],
+  ['subscribers', 'Most subscribed'],
+  ['recent', 'Most recent'],
+];
+const AUTHOR_PAGE_SIZE = readNumberEnv('AUTHOR_PAGE_SIZE', 30);
 
 // 默认严格校验证书；仅在本机被 hosts 劫持时用 ALLOW_INSECURE_TLS=1 临时放开
 const insecureHttpsAgent =
@@ -122,7 +132,7 @@ app.get('/search', async (req, res) => {
 
   res.render('search-results', {
     title: 'Search Results - Wallpaper Search',
-    items: result.items,
+    items: result.items.map(item => ({ ...item, meta: `by ${item.authorName}` })),
     searchtext: params.searchText,
     requiredtags: params.requiredTags,
     requiredtype: params.requiredType,
@@ -134,6 +144,101 @@ app.get('/search', async (req, res) => {
     errorAction: result.errorAction,
   });
 });
+
+// 创作者作品页：数据源是 IPublishedFileService/GetUserFiles（唯一支持按作者过滤的官方接口）
+app.get('/author/:steamId', async (req, res) => {
+  const steamId = String(req.params.steamId || '');
+  if (!/^\d{17}$/.test(steamId)) {
+    return res.status(404).render('404', { title: '404 - Page Not Found' });
+  }
+
+  const searchParams = normalizeSearchParams(req.query);
+  const sortMode = AUTHOR_SORT_OPTIONS.some(([value]) => value === searchParams.browseSort)
+    ? searchParams.browseSort
+    : 'default';
+
+  const baseView = {
+    title: 'Creator items - Wallpaper Search',
+    authorId: steamId,
+    searchtext: '',
+    requiredtags: searchParams.requiredTags,
+    requiredtype: searchParams.requiredType,
+    section: searchParams.section,
+    browsesort: sortMode,
+    listBase: `/author/${steamId}`,
+    formAction: `/author/${steamId}`,
+    sortOptions: AUTHOR_SORT_OPTIONS,
+    page: 1,
+    maxPage: 1,
+    items: [],
+  };
+
+  const matureRequest = searchParams.requiredTags === 'Mature';
+  if (matureRequest && !hasMatureAccess(req.cookies)) {
+    res.set('Cache-Control', 'private, no-store');
+    return res.render('search-results', {
+      ...baseView,
+      error: 'Mature search is locked.',
+      errorAction: 'invite',
+    });
+  }
+
+  const cacheKey = JSON.stringify([steamId, searchParams.requiredTags, searchParams.requiredType]);
+  let data = authorCache.get(cacheKey);
+
+  if (!data) {
+    try {
+      data = await fetchAuthorFiles(steamId, {
+        requiredTags: searchParams.requiredTags,
+        requiredType: searchParams.requiredType,
+        axiosConfig: requestOptions({ timeout: UPSTREAM_TIMEOUT_MS }),
+      });
+    } catch (error) {
+      logUpstreamFailure('creator files', error);
+      data = null;
+    }
+
+    if (!data) {
+      res.set('Cache-Control', 'private, no-store');
+      return res.render('search-results', {
+        ...baseView,
+        error: 'Could not load this creator right now. Please try again later.',
+      });
+    }
+
+    authorCache.set(cacheKey, data);
+  }
+
+  const sorted = sortAuthorItems(data.items, sortMode);
+  const maxPage = Math.max(1, Math.ceil(sorted.length / AUTHOR_PAGE_SIZE));
+  const page = Math.min(Math.max(searchParams.page, 1), maxPage);
+  const pageItems = sorted.slice((page - 1) * AUTHOR_PAGE_SIZE, page * AUTHOR_PAGE_SIZE);
+
+  res.set(
+    'Cache-Control',
+    matureRequest ? 'private, no-store' : 'public, max-age=300, stale-while-revalidate=600'
+  );
+
+  res.render('search-results', {
+    ...baseView,
+    page,
+    maxPage,
+    items: pageItems.map(item => ({
+      sharedfileId: item.sharedfileId,
+      title: item.title,
+      previewImage: item.previewImage,
+      meta: formatSubscriberCount(item.subscriptions),
+    })),
+  });
+});
+
+function formatSubscriberCount(count) {
+  const value = Number(count) || 0;
+  if (value <= 0) return 'No subscribers yet';
+  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M subscribers`;
+  if (value >= 1_000) return `${(value / 1_000).toFixed(1)}k subscribers`;
+  return `${value} subscribers`;
+}
 
 app.get('/item/:id', async (req, res) => {
   const sharedfileId = String(req.params.id || '');
@@ -458,6 +563,7 @@ async function handleItemDetail(sharedfileId) {
     currentFavorites: itemDetails.favorited || 'N/A',
     creatorAvatarUrl: profile?.avatarUrl || null,
     creatorName: profile?.creatorName || null,
+    creatorId,
     creatorProfileUrl,
   };
 }

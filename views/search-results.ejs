@@ -1,11 +1,13 @@
+<% const paginationBase = typeof listBase !== 'undefined' && listBase ? listBase : '/search'; %>
+<% const isAuthorView = typeof authorId !== 'undefined' && authorId; %>
 <header class="page-header">
   <div class="page-header-main">
     <a class="icon-button" href="/" aria-label="Back to home" title="Back to home">
       <i data-lucide="arrow-left" aria-hidden="true"></i>
     </a>
     <div>
-      <h1>Search</h1>
-      <p><%= searchtext ? 'Results for "' + searchtext + '"' : 'Browse Workshop items' %></p>
+      <h1><%= isAuthorView ? 'Creator items' : 'Search' %></h1>
+      <p><%= isAuthorView ? 'All wallpapers uploaded by this creator' : (searchtext ? 'Results for "' + searchtext + '"' : 'Browse Workshop items') %></p>
     </div>
   </div>
 </header>
@@ -41,7 +43,7 @@
           </div>
           <div class="wallpaper-post-content">
             <h2 class="wallpaper-post-title"><%= item.title %></h2>
-            <p class="wallpaper-post-author">by <%= item.authorName %></p>
+            <p class="wallpaper-post-author"><%= item.meta || ('by ' + item.authorName) %></p>
             <span class="wallpaper-post-action">
               View details
               <i data-lucide="arrow-up-right" aria-hidden="true"></i>
@@ -67,11 +69,11 @@
       <% if (page > 1) { %>
         <% if (page > 2) { %>
           <li>
-            <a class="page-link" href="/search?searchtext=<%= encodeURIComponent(searchtext) %>&requiredtags=<%= requiredtags %>&requiredtype=<%= requiredtype %>&section=<%= section %>&p=1&browsesort=<%= browsesort %>">First</a>
+            <a class="page-link" href="<%= paginationBase %>?searchtext=<%= encodeURIComponent(searchtext) %>&requiredtags=<%= requiredtags %>&requiredtype=<%= requiredtype %>&section=<%= section %>&p=1&browsesort=<%= browsesort %>">First</a>
           </li>
         <% } %>
         <li>
-          <a class="page-link" href="/search?searchtext=<%= encodeURIComponent(searchtext) %>&requiredtags=<%= requiredtags %>&requiredtype=<%= requiredtype %>&section=<%= section %>&p=<%= parseInt(page) - 1 %>&browsesort=<%= browsesort %>">
+          <a class="page-link" href="<%= paginationBase %>?searchtext=<%= encodeURIComponent(searchtext) %>&requiredtags=<%= requiredtags %>&requiredtype=<%= requiredtype %>&section=<%= section %>&p=<%= parseInt(page) - 1 %>&browsesort=<%= browsesort %>">
             <i data-lucide="chevron-left" aria-hidden="true"></i>
             Previous
           </a>
@@ -80,14 +82,14 @@
       <li><span class="page-link page-current">Page <%= page %> of <%= maxPage %></span></li>
       <% if (page < maxPage) { %>
         <li>
-          <a class="page-link" href="/search?searchtext=<%= encodeURIComponent(searchtext) %>&requiredtags=<%= requiredtags %>&requiredtype=<%= requiredtype %>&section=<%= section %>&p=<%= parseInt(page) + 1 %>&browsesort=<%= browsesort %>">
+          <a class="page-link" href="<%= paginationBase %>?searchtext=<%= encodeURIComponent(searchtext) %>&requiredtags=<%= requiredtags %>&requiredtype=<%= requiredtype %>&section=<%= section %>&p=<%= parseInt(page) + 1 %>&browsesort=<%= browsesort %>">
             Next
             <i data-lucide="chevron-right" aria-hidden="true"></i>
           </a>
         </li>
         <% if (page < maxPage - 1) { %>
           <li>
-            <a class="page-link" href="/search?searchtext=<%= encodeURIComponent(searchtext) %>&requiredtags=<%= requiredtags %>&requiredtype=<%= requiredtype %>&section=<%= section %>&p=<%= maxPage %>&browsesort=<%= browsesort %>">Last</a>
+            <a class="page-link" href="<%= paginationBase %>?searchtext=<%= encodeURIComponent(searchtext) %>&requiredtags=<%= requiredtags %>&requiredtype=<%= requiredtype %>&section=<%= section %>&p=<%= maxPage %>&browsesort=<%= browsesort %>">Last</a>
           </li>
         <% } %>
       <% } %>
