@@ -9,6 +9,7 @@ const axios = require('axios');
 const { parseHTML } = require('linkedom');
 const path = require('path');
 const https = require('https');
+const crypto = require('crypto');
 
 const { formatDescription } = require('./lib/bbcode');
 const { MemoryCache } = require('./lib/memoryCache');
@@ -16,11 +17,9 @@ const { getCookieHeader, getDecryptedCookies } = require('./lib/cookieManager');
 const { parseSsrItems } = require('./lib/steamSsrParser');
 const { parseSteamProfile } = require('./lib/steamProfileParser');
 const { fetchPreviews } = require('./lib/steamPreviews');
+const { normalizeSearchParams, toSortValue } = require('./lib/searchParams');
 
 const WORKSHOP_APP_ID = '431960';
-const DEFAULT_SECTION = 'readytouseitems';
-const DEFAULT_SORT = 'textsearch';
-const DEFAULT_TREND_DAYS = '7';
 const STEAM_USER_AGENT =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36';
 
@@ -48,6 +47,21 @@ const insecureHttpsAgent =
 
 function requestOptions(extra = {}) {
   return insecureHttpsAgent ? { ...extra, httpsAgent: insecureHttpsAgent } : extra;
+}
+
+// 常量时间比较，避免用 === 比较邀请码时泄露前缀长度
+function safeEqual(a, b) {
+  if (typeof a !== 'string' || typeof b !== 'string') return false;
+  const bufferA = Buffer.from(a, 'utf8');
+  const bufferB = Buffer.from(b, 'utf8');
+  if (bufferA.length !== bufferB.length) return false;
+  return crypto.timingSafeEqual(bufferA, bufferB);
+}
+
+function hasMatureAccess(cookies = {}) {
+  const inviteCode = process.env.INVITE_CODE;
+  if (!inviteCode) return false;
+  return safeEqual(cookies.code, inviteCode);
 }
 
 // 只保留状态码/错误码/消息，避免把带 Cookie 的 axios config 打进日志
@@ -97,12 +111,13 @@ app.get('/search', async (req, res) => {
   const params = normalizeSearchParams(req.query);
   const result = await handleSearch(params, req.cookies);
 
-  // Mature 结果绝不能被公共缓存，否则会绕过邀请码把内容下发出去
-  if (result.error || result.mature) {
-    res.set('Cache-Control', 'private, no-store');
-  } else {
-    res.set('Cache-Control', 'public, max-age=300, stale-while-revalidate=600');
-  }
+  // 只有 Everyone 且成功的响应才允许进公共缓存：
+  // Mature 会绕过邀请码，Questionable 同样不适合放进 CDN
+  const publiclyCacheable = !result.error && params.requiredTags === 'Everyone';
+  res.set(
+    'Cache-Control',
+    publiclyCacheable ? 'public, max-age=300, stale-while-revalidate=600' : 'private, no-store'
+  );
 
   res.render('search-results', {
     title: 'Search Results - Wallpaper Search',
@@ -135,7 +150,21 @@ app.get('/item/:id', async (req, res) => {
     return res.status(404).render('404', { title: '404 - Page Not Found' });
   }
 
-  res.set('Cache-Control', 'public, max-age=600, stale-while-revalidate=1800');
+  // Mature 条目的详情页同样要门禁：否则搜索被拦住，攻击者仍可凭 ID 直接看内容
+  if (item.ageRating === 'Mature' && !hasMatureAccess(req.cookies)) {
+    res.set('Cache-Control', 'private, no-store');
+    return res.status(403).render('content-locked', {
+      title: 'Mature content locked - Wallpaper Search',
+    });
+  }
+
+  // Mature 页一律不进公共缓存，否则授权用户访问后会把缓存喂给未授权用户
+  res.set(
+    'Cache-Control',
+    item.ageRating === 'Mature'
+      ? 'private, no-store'
+      : 'public, max-age=600, stale-while-revalidate=1800'
+  );
   res.render('item-detail', {
     title: `${item.title} - Wallpaper Search`,
     item: { ...item, description: formatDescription(item.description) },
@@ -178,42 +207,8 @@ if (require.main === module) {
 }
 
 // ---------------------------------------------------------------------------
-// 搜索参数
+// 搜索参数（规范化与白名单在 lib/searchParams.js）
 // ---------------------------------------------------------------------------
-
-function normalizeSearchParams(query = {}) {
-  const rawPage = Number.parseInt(query.p, 10);
-  const page = Number.isFinite(rawPage) && rawPage > 0 ? rawPage : 1;
-
-  // 表单里 browsesort 的值形如 "trend&days=7"，这里拆回 sort + days 两段
-  let browseSort = typeof query.browsesort === 'string' ? query.browsesort.trim() : '';
-  let trendDays = typeof query.days === 'string' ? query.days.trim() : '';
-  const trendMatch = browseSort.match(/^trend(?:\s*&\s*days=(-?\d+))?$/);
-
-  if (trendMatch) {
-    browseSort = 'trend';
-    if (!trendDays && trendMatch[1]) trendDays = trendMatch[1];
-    if (!trendDays) trendDays = DEFAULT_TREND_DAYS;
-  } else if (!browseSort) {
-    browseSort = DEFAULT_SORT;
-  }
-
-  return {
-    searchText: typeof query.searchtext === 'string' ? query.searchtext.trim() : '',
-    requiredTags:
-      typeof query.requiredtags === 'string' && query.requiredtags ? query.requiredtags : 'Everyone',
-    requiredType: typeof query.requiredtype === 'string' ? query.requiredtype : '',
-    section: typeof query.section === 'string' && query.section ? query.section : DEFAULT_SECTION,
-    page,
-    browseSort,
-    trendDays,
-  };
-}
-
-// 回填到表单/分页链接的 sort 值，保持与 option 的 value 一致
-function toSortValue(params) {
-  return params.browseSort === 'trend' ? `trend&days=${params.trendDays}` : params.browseSort;
-}
 
 function buildSteamBrowseUrl(params) {
   const url = new URL('https://steamcommunity.com/workshop/browse/');
@@ -243,7 +238,7 @@ async function handleSearch(params, cookies = {}) {
   const matureRequest = params.requiredTags === 'Mature';
   const inviteCode = process.env.INVITE_CODE;
 
-  if (matureRequest && !(inviteCode && cookies.code === inviteCode)) {
+  if (matureRequest && !(inviteCode && safeEqual(cookies.code, inviteCode))) {
     return {
       items: [],
       maxPage: 1,
@@ -255,9 +250,7 @@ async function handleSearch(params, cookies = {}) {
 
   // Wallpaper Engine 2.8.42 起永久移除 Application 类型（工坊侧已清空），
   // 老链接或手工构造的参数会拿到 0 条，这里直接说明原因而不是白跑一次上游请求
-  const asksForApplication =
-    params.requiredType.toLowerCase() === 'application' ||
-    params.requiredTags.toLowerCase() === 'application';
+  const asksForApplication = params.asksForApplication === true;
 
   if (asksForApplication) {
     return {
